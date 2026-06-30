@@ -247,8 +247,9 @@ describe('AuthService', () => {
       // When
       prismaMock.user.update.mockResolvedValue(mockedResponse);
 
-      // Then
-      await expect(updateUser(user, user.id)).resolves.toHaveProperty('token');
+// Then
+      const result = await updateUser(user, user.id);
+      expect(result).toHaveProperty('token');
     });
   });
 });
