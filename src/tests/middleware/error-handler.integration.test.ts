@@ -177,7 +177,8 @@ describe('Error Handler Integration Tests', () => {
       });
 
 // Sensitive details should not be in the response
-      const responseData = mockResponse.json.mock.calls?.[0]?.[0] || {};
+      expect(mockResponse.json).toHaveBeenCalled();
+      const responseData = (mockResponse.json as jest.Mock).mock.calls?.[0]?.[0] || {};
       expect(JSON.stringify(responseData)).not.toContain('secret123');
       expect(JSON.stringify(responseData)).not.toContain('Stack trace');
     });
