@@ -1,0 +1,86 @@
+# Docker Compose — Conduit API + LGTM observability stack
+#
+# LGTM = Loki (logs) + Grafana (dashboards) + Tempo (traces) + Mimir/Prometheus (metrics)
+# The grafana/otel-lgtm image bundles all four with a pre-configured OTel Collector.
+#
+# Usage:
+#   docker compose up --build
+#
+# Grafana:    http://localhost:3001  (admin / admin)
+# API:        http://localhost:3000/api
+# Prometheus: http://localhost:9090  (exposed for direct queries)
+# OTLP gRPC:  localhost:4317
+# OTLP HTTP:  localhost:4318
+
+services:
+  # ─── Database ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-conduit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-conduit}
+      POSTGRES_DB: ${POSTGRES_DB:-conduit}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-conduit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── LGTM (Loki + Grafana + Tempo + Prometheus/Mimir) ───────────────────────
+  # Single container from Grafana Labs that includes:
+  #   • Prometheus (metrics storage, scraped from /metrics or via OTLP push)
+  #   • Loki      (log aggregation)
+  #   • Tempo     (distributed tracing)
+  #   • Grafana   (dashboards, datasources pre-configured)
+  #   • OTel Collector (accepts OTLP gRPC :4317 and HTTP :4318)
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    restart: unless-stopped
+    ports:
+      - "3001:3000"   # Grafana UI  (mapped to 3001 — API already owns 3000)
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "9090:9090"   # Prometheus HTTP
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - lgtm_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  # ─── API ────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-conduit}:${POSTGRES_PASSWORD:-conduit}@postgres:5432/${POSTGRES_DB:-conduit}
+      JWT_SECRET: ${JWT_SECRET:-superSecret}
+      # OTel SDK configuration — points to the bundled collector inside lgtm
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      OTEL_SERVICE_NAME: conduit-api
+      OTEL_SERVICE_VERSION: ${npm_package_version:-0.0.0}
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lgtm:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  lgtm_data:

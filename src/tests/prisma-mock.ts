@@ -14,4 +14,5 @@ beforeEach(() => {
   mockReset(prismaMock);
 });
 
+export { mockReset };
 export default prismaMock;

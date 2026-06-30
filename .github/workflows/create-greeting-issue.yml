@@ -1,0 +1,46 @@
+name: Create Greeting Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    if: github.event.issue.author_association == 'OWNER' || github.event.issue.author_association == 'COLLABORATOR' || github.event.issue.author_association == 'CONTRIBUTOR'
+    permissions:
+      issues: write
+    steps:
+      - name: Greet the contributor
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const message = `
+            ## 🎉 Welcome to the Conduit API Project!
+            
+            Thank you for opening this issue! Here's what happens next:
+            
+            ### 📋 Issue Processing
+            1. **Triage**: Team will review and prioritize this issue
+            2. **Planning**:Issue will be assigned to appropriate spring
+            3. **Development**: Implementation work will begin
+            4. **Testing**: Comprehensive testing will be performed
+            5. **Review**: Code review and quality assurance
+            6. **Deploy**: Deployment to production
+            
+            ### 🔗 Project Resources
+            - 📖 [API Documentation](http://localhost:3000/api-docs)
+            - 🏗️ [Development Guide](./doc/agent/OPERATING-GUIDE.md)
+            - 🧪 [Testing Guidelines](./e2e/playwright/README.md)
+            - 📊 [LGTM Dashboard](http://localhost:3001)
+            
+            ---
+            **Issue #${issue.number} created**`;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: message
+            });
