@@ -1,8 +1,10 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist/out-tsc",
+    "outDir": "./dist/ts",
+    "target": "es2017",
     "module": "commonjs",
+    "lib": ["es2017"],
     "types": ["node"]
   },
   "exclude": [

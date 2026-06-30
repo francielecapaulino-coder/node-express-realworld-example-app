@@ -17,8 +17,9 @@
         "tsConfig": "tsconfig.app.json",
         "assets": ["src/assets/**/**"],
         "generatePackageJson": true,
-        "esbuildOptions": {
+"esbuildOptions": {
           "sourcemap": true,
+          "target": "es2020",
           "outExtension": {
             ".js": ".js"
           }
