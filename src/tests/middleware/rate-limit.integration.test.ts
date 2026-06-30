@@ -162,7 +162,7 @@ describe('Rate Limiting Integration Tests', () => {
       };
 
 // When
-      middleware(forwardedRequest, mockResponse as Response, nextFunction);
+      middleware(forwardedRequest as Request, mockResponse as Response, nextFunction);
 
       // Then
       expect(nextFunction).toHaveBeenCalledTimes(1);

@@ -131,8 +131,10 @@ describe('Error Handler Integration Tests', () => {
         { error: new Error('Generic error'), expectedCode: 500 },
       ];
 
-      errorCases.forEach(({ error, expectedCode }) => {
-        error.name = error.message.includes('Error') ? error.message : error.constructor.name;
+errorCases.forEach(({ error, expectedCode }) => {
+        Object.defineProperty(error, 'name', {
+          value: error.message.includes('Error') ? error.message : error.constructor.name
+        });
 
         // Reset mock
         mockResponse.status = jest.fn().mockReturnThis();

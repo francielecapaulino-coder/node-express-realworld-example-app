@@ -93,9 +93,9 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
     requestId: req.headers['x-request-id'],
   }, '[HTTP_METRICS] Request started');
   
-  // Override res.end to track completion
+// Override res.end to track completion
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any) {
+  (res.end as any) = function(chunk?: any, encoding?: any, cb?: any) {
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000; // Convert to seconds
     
@@ -130,7 +130,7 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
     });
     
 // Log request completion
-    const const logLevel = isError ? 'warn' : 'info';
+    const logLevel = isError ? 'warn' : 'info';
     logger[logLevel]({
       method: req.method,
       url: req.url,
