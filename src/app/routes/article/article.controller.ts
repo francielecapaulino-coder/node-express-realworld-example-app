@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import auth from '../auth/auth';
+import { asyncHandler } from '../../middleware/error-handler.middleware';
 import {
   addComment,
   bookmarkArticle,
@@ -29,14 +30,10 @@ const router = Router();
  * @queryparam favorited
  * @returns articles: list of articles
  */
-router.get('/articles', auth.optional, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await getArticles(req.query, req.auth?.user?.id);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
+router.get('/articles', auth.optional, asyncHandler(async (req: Request, res: Response) => {
+  const result = await getArticles(req.query, req.auth?.user?.id);
+  res.json(result);
+}));
 
 /**
  * Get paginated feed articles
@@ -243,11 +240,52 @@ router.delete(
 );
 
 /**
- * Bookmark article
- * @auth required
- * @route {POST} /articles/:slug/bookmark
- * @param slug slug of the article (based on the title)
- * @returns article bookmarked article
+ * @swagger
+ * /articles/{slug}/bookmark:
+ *   post:
+ *     tags:
+ *       - Articles
+ *       - Bookmarks
+ *     summary: Bookmark an article
+ *     description: Add an article to the authenticated user's bookmarks collection
+ *     security:
+ *       - TokenAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The slug of the article to bookmark
+ *     responses:
+ *       201:
+ *         description: Article bookmarked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ArticleResponse'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     authorization: ["missing or invalid authorization credentials"]
+ *       404:
+ *         description: Article not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     article: ["not found"]
  */
 router.post(
   '/articles/:slug/bookmark',

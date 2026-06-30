@@ -21,6 +21,8 @@ import * as bodyParser from 'body-parser';
 import routes from './app/routes/routes';
 import HttpException from './app/models/http-exception.model';
 import { httpMetricsMiddleware } from './app/middleware/http-metrics.middleware';
+import { globalErrorHandler, notFoundHandler } from './app/middleware/error-handler.middleware';
+import { setupSwagger } from './config/swagger';
 
 const app = express();
 
@@ -35,39 +37,27 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Increment http_requests_total counter on every request
 app.use(httpMetricsMiddleware);
 
+// Setup Swagger documentation
+setupSwagger(app);
+
 app.use(routes);
 
 // Serves images
 app.use(express.static(__dirname + '/assets'));
 
 app.get('/', (_req: express.Request, res: express.Response) => {
-  res.json({ status: 'API is running on /api' });
+  res.json({ 
+    status: 'API is running on /api',
+    documentation: 'Swagger UI available at /api-docs',
+    openapi: 'OpenAPI spec available at /api-docs.json'
+  });
 });
 
-/* eslint-disable */
-app.use(
-  (
-    err: Error | HttpException,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction,
-  ) => {
-    // @ts-ignore
-    if (err && err.name === 'UnauthorizedError') {
-      return res.status(401).json({
-        status: 'error',
-        message: 'missing authorization credentials',
-      });
-      // @ts-ignore
-    } else if (err && err.errorCode) {
-      // @ts-ignore
-      res.status(err.errorCode).json(err.message);
-    } else if (err) {
-      res.status(500).json(err.message);
-    }
-  },
-);
-/* eslint-enable */
+// Handle 404 for unmatched routes
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(globalErrorHandler);
 
 /**
  * Server activation

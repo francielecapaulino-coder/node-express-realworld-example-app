@@ -6,11 +6,43 @@ import { loginRateLimit } from '../../middleware/rate-limit.middleware';
 const router = Router();
 
 /**
- * Create an user
- * @auth none
- * @route {POST} /users
- * @bodyparam user User
- * @returns user User
+ * @swagger
+ * /users:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Register a new user
+ *     description: Create a new user account and return the user with JWT token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user:
+ *                 $ref: '#/components/schemas/User'
+ *             required:
+ *               - user
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       422:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     username: ["has already been taken"]
+ *                     email: ["has already been taken"]
  */
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -22,11 +54,62 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 /**
- * Login
- * @auth none
- * @route {POST} /users/login
- * @bodyparam user User
- * @returns user User
+ * @swagger
+ * /users/login:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Login user
+ *     description: Authenticate user with email and password and return JWT token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user:
+ *                 type: object
+ *                 properties:
+ *                   email:
+ *                     type: string
+ *                     format: email
+ *                   password:
+ *                     type: string
+ *                 required:
+ *                   - email
+ *                   - password
+ *             required:
+ *               - user
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     email or password: ["is invalid"]
+ *       429:
+ *         description: Too many login attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     rate-limit: ["Too many login attempts from this IP, please try again after 15 minutes"]
  */
 router.post('/users/login', loginRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
