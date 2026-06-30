@@ -20,7 +20,7 @@ import cors from 'cors';
 import * as bodyParser from 'body-parser';
 import routes from './app/routes/routes';
 import HttpException from './app/models/http-exception.model';
-import { httpMetricsMiddleware } from './app/middleware/http-metrics.middleware';
+import { httpMetricsMiddleware, metricsHandler, prometheusMetricsHandler } from './app/middleware/http-metrics.middleware';
 import { globalErrorHandler, notFoundHandler } from './app/middleware/error-handler.middleware';
 import { setupSwagger } from './config/swagger';
 
@@ -52,6 +52,10 @@ app.get('/', (_req: express.Request, res: express.Response) => {
     openapi: 'OpenAPI spec available at /api-docs.json'
   });
 });
+
+// LGTM Stack Metrics Endpoints
+app.get('/api/metrics', metricsHandler);
+app.get('/metrics', prometheusMetricsHandler);
 
 // Handle 404 for unmatched routes
 app.use(notFoundHandler);
