@@ -1,0 +1,71 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Stryker Mutation Testing Configuration - Target: 95% mutation score",
+  "packageManager": "npm",
+  "reporters": [
+    "progress",
+    "clear-text",
+    "html",
+    "json",
+    "dashboard"
+  ],
+  "dashboard": {
+    "project": "node-express-realworld-example",
+    "version": "main",
+    "module": "api"
+  },
+  "testRunner": "jest",
+  "testRunnerComment": "Use Jest as test runner for both unit and integration tests",
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/**/*.test.ts",
+    "!src/tests/**/*",
+    "!src/main.ts",
+    "!dist/**/*",
+    "!node_modules/**/*"
+  ],
+  "tempDirName": ".stryker-temp",
+  "cleanTempDir": true,
+  "timeout": 60000,
+  "maxConcurrentTestRunners": 4,
+  "tsconfigFile": "tsconfig.json",
+  "logLevel": "info",
+  
+  "jest": {
+    "projectType": "custom",
+    "configFile": "jest.config.ts"
+  },
+
+  "thresholds": {
+    "high": 95,
+    "low": 90,
+    "break": 85
+  },
+  
+  "mutatorOptions": {
+    "typescript": {
+      "exclude": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**"
+      ]
+    }
+  },
+
+  "plugins": [
+    "@stryker-mutator/jest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
+
+  "ignorePatterns": [
+    "*.config.js",
+    "*.spec.ts", 
+    "*.test.ts",
+    "node_modules",
+    "dist",
+    ".stryker-temp",
+    "coverage"
+  ]
+}
