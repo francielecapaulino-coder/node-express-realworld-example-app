@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response, Router } from 'express';
+import { Request, Response, Router } from 'express';
 import auth from '../auth/auth';
 import { asyncHandler } from '../../middleware/error-handler.middleware';
 import {
@@ -31,32 +31,31 @@ const router = Router();
  * @returns articles: list of articles
  */
 router.get('/articles', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-  const result = await getArticles(req.query, req.auth?.user?.id);
+  const result = await getArticles(
+    req.query,
+    Number(req.query.offset),
+    Number(req.query.limit),
+    req.auth?.user?.id,
+  );
   res.json(result);
 }));
 
 /**
- * Get paginated feed articles
+ * Get user feed
  * @auth required
  * @route {GET} /articles/feed
- * @returns articles list of articles
+ * @queryparam offset number of articles dismissed from the first one
+ * @queryparam limit number of articles returned
+ * @returns articles: list of articles
  */
-router.get(
-  '/articles/feed',
-  auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const result = await getFeed(
-        Number(req.query.offset),
-        Number(req.query.limit),
-        req.auth?.user?.id,
-      );
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
-  },
-);
+router.get('/articles/feed', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const result = await getFeed(
+    Number(req.query.offset),
+    Number(req.query.limit),
+    req.auth?.user?.id,
+  );
+  res.json(result);
+}));
 
 /**
  * Create article
@@ -67,137 +66,47 @@ router.get(
  * @bodyparam  tagList list of tags
  * @returns article created article
  */
-router.post('/articles', auth.required, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const article = await createArticle(req.body.article, req.auth?.user?.id);
-    res.status(201).json({ article });
-  } catch (error) {
-    next(error);
-  }
-});
+router.post('/articles', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const article = await createArticle(req.body.article, req.auth?.user?.id);
+  res.status(201).json({ article });
+}));
 
 /**
- * Get unique article
+ * Get single article
  * @auth optional
- * @route {GET} /article/:slug
+ * @route {GET} /articles/:slug
  * @param slug slug of the article (based on the title)
- * @returns article
+ * @returns article single article
  */
-router.get(
-  '/articles/:slug',
-  auth.optional,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await getArticle(req.params.slug, req.auth?.user?.id);
-      res.json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
+router.get('/articles/:slug', auth.optional, asyncHandler(async (req: Request, res: Response) => {
+  const article = await getArticle(req.params.slug, req.auth?.user?.id);
+  res.json({ article });
+}));
 
 /**
  * Update article
  * @auth required
  * @route {PUT} /articles/:slug
  * @param slug slug of the article (based on the title)
- * @bodyparam title new title
- * @bodyparam description new description
- * @bodyparam body new content
+ * @bodyparam article (title, description, body)
  * @returns article updated article
  */
-router.put(
-  '/articles/:slug',
-  auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await updateArticle(req.body.article, req.params.slug, req.auth?.user?.id);
-      res.json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
+router.put('/articles/:slug', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const article = await updateArticle(req.body.article, req.params.slug, req.auth?.user?.id);
+  res.json({ article });
+}));
 
 /**
  * Delete article
  * @auth required
- * @route {DELETE} /article/:id
- * @param slug slug of the article
- */
-router.delete(
-  '/articles/:slug',
-  auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await deleteArticle(req.params.slug, req.auth?.user!.id);
-      res.sendStatus(204);
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-/**
- * Get comments from an article
- * @auth optional
- * @route {GET} /articles/:slug/comments
+ * @route {DELETE} /articles/:slug
  * @param slug slug of the article (based on the title)
- * @returns comments list of comments
+ * @returns article deleted article
  */
-router.get(
-  '/articles/:slug/comments',
-  auth.optional,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const comments = await getCommentsByArticle(req.params.slug, req.auth?.user?.id);
-      res.json({ comments });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-/**
- * Add comment to article
- * @auth required
- * @route {POST} /articles/:slug/comments
- * @param slug slug of the article (based on the title)
- * @bodyparam body content of the comment
- * @returns comment created comment
- */
-router.post(
-  '/articles/:slug/comments',
-  auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const comment = await addComment(req.body.comment.body, req.params.slug, req.auth?.user?.id);
-      res.json({ comment });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-/**
- * Delete comment
- * @auth required
- * @route {DELETE} /articles/:slug/comments/:id
- * @param slug slug of the article (based on the title)
- * @param id id of the comment
- */
-router.delete(
-  '/articles/:slug/comments/:id',
-  auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await deleteComment(Number(req.params.id), req.auth?.user?.id);
-      res.status(200).json({});
-    } catch (error) {
-      next(error);
-    }
-  },
-);
+router.delete('/articles/:slug', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const article = await deleteArticle(req.params.slug, req.auth?.user?.id);
+  res.json({ article });
+}));
 
 /**
  * Favorite article
@@ -209,14 +118,10 @@ router.delete(
 router.post(
   '/articles/:slug/favorite',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await favoriteArticle(req.params.slug, req.auth?.user?.id);
-      res.json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const article = await favoriteArticle(req.params.slug, req.auth?.user?.id);
+    res.json({ article });
+  }),
 );
 
 /**
@@ -229,75 +134,79 @@ router.post(
 router.delete(
   '/articles/:slug/favorite',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await unfavoriteArticle(req.params.slug, req.auth?.user?.id);
-      res.json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const article = await unfavoriteArticle(req.params.slug, req.auth?.user?.id);
+    res.json({ article });
+  }),
 );
 
 /**
- * @swagger
- * /articles/{slug}/bookmark:
- *   post:
- *     tags:
- *       - Articles
- *       - Bookmarks
- *     summary: Bookmark an article
- *     description: Add an article to the authenticated user's bookmarks collection
- *     security:
- *       - TokenAuth: []
- *     parameters:
- *       - in: path
- *         name: slug
- *         required: true
- *         schema:
- *           type: string
- *         description: The slug of the article to bookmark
- *     responses:
- *       201:
- *         description: Article bookmarked successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ArticleResponse'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 errors:
- *                   type: object
- *                   example:
- *                     authorization: ["missing or invalid authorization credentials"]
- *       404:
- *         description: Article not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 errors:
- *                   type: object
- *                   example:
- *                     article: ["not found"]
+ * Add comment to article
+ * @auth required
+ * @route {POST} /articles/:slug/comments
+ * @bodyparam comment
+ * @returns comment added comment
+ */
+router.post(
+  '/articles/:slug/comments',
+  auth.required,
+  asyncHandler(async (req: Request, res: Response) => {
+    const comment = await addComment(req.body.comment.body, req.params.slug, req.auth?.user?.id);
+    res.json({ comment });
+  }),
+);
+
+/**
+ * Delete comment
+ * @auth required
+ * @route {DELETE} /articles/:slug/comments/:id
+ * @param slug slug of the article (based on the title)
+ * @param id id of the comment
+ * @returns comment deleted comment
+ */
+router.delete(
+  '/articles/:slug/comments/:id',
+  auth.required,
+  asyncHandler(async (req: Request, res: Response) => {
+    const comment = await deleteComment(
+      req.params.slug,
+      Number(req.params.id),
+      req.auth?.user?.id,
+    );
+    res.json({ comment });
+  }),
+);
+
+/**
+ * Get article comments
+ * @auth optional
+ * @route {GET} /articles/:slug/comments
+ * @param slug slug of the article (based on the title)
+ * @returns comments list of comments
+ */
+router.get(
+  '/articles/:slug/comments',
+  auth.optional,
+  asyncHandler(async (req: Request, res: Response) => {
+    const comments = await getCommentsByArticle(req.params.slug);
+    res.json({ comments });
+  }),
+);
+
+/**
+ * Bookmark article
+ * @auth required
+ * @route {POST} /articles/:slug/bookmark
+ * @param slug slug of the article (based on the title)
+ * @returns article bookmarked article
  */
 router.post(
   '/articles/:slug/bookmark',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await bookmarkArticle(req.params.slug, req.auth?.user?.id);
-      res.status(201).json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const article = await bookmarkArticle(req.params.slug, req.auth?.user?.id);
+    res.status(201).json({ article });
+  }),
 );
 
 /**
@@ -310,14 +219,10 @@ router.post(
 router.delete(
   '/articles/:slug/bookmark',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const article = await unbookmarkArticle(req.params.slug, req.auth?.user?.id);
-      res.json({ article });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const article = await unbookmarkArticle(req.params.slug, req.auth?.user?.id);
+    res.json({ article });
+  }),
 );
 
 export default router;

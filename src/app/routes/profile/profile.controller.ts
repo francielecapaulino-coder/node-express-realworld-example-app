@@ -1,4 +1,5 @@
-import { NextFunction, Request, Response, Router } from 'express';
+import { Request, Response, Router } from 'express';
+import { asyncHandler } from '../../middleware/error-handler.middleware';
 import auth from '../auth/auth';
 import { followUser, getProfile, unfollowUser } from './profile.service';
 
@@ -14,14 +15,10 @@ const router = Router();
 router.get(
   '/profiles/:username',
   auth.optional,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const profile = await getProfile(req.params.username, req.auth?.user?.id);
-      res.json({ profile });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const profile = await getProfile(req.params.username, req.auth?.user?.id);
+    res.json({ profile });
+  }),
 );
 
 /**
@@ -34,14 +31,10 @@ router.get(
 router.post(
   '/profiles/:username/follow',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const profile = await followUser(req.params?.username, req.auth?.user?.id);
-      res.json({ profile });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const profile = await followUser(req.params?.username, req.auth?.user?.id);
+    res.json({ profile });
+  }),
 );
 
 /**
@@ -54,14 +47,10 @@ router.post(
 router.delete(
   '/profiles/:username/follow',
   auth.required,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const profile = await unfollowUser(req.params.username, req.auth?.user?.id);
-      res.json({ profile });
-    } catch (error) {
-      next(error);
-    }
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const profile = await unfollowUser(req.params.username, req.auth?.user?.id);
+    res.json({ profile });
+  }),
 );
 
 export default router;

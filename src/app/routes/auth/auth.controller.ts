@@ -1,4 +1,5 @@
-import { NextFunction, Request, Response, Router } from 'express';
+import { Request, Response, Router } from 'express';
+import { asyncHandler } from '../../middleware/error-handler.middleware';
 import auth from './auth';
 import { createUser, getCurrentUser, login, updateUser } from './auth.service';
 import { loginRateLimit } from '../../middleware/rate-limit.middleware';
@@ -44,14 +45,10 @@ const router = Router();
  *                     username: ["has already been taken"]
  *                     email: ["has already been taken"]
  */
-router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await createUser({ ...req.body.user, demo: false });
-    res.status(201).json({ user });
-  } catch (error) {
-    next(error);
-  }
-});
+router.post('/users', asyncHandler(async (req: Request, res: Response) => {
+  const user = await createUser({ ...req.body.user, demo: false });
+  res.status(201).json({ user });
+}));
 
 /**
  * @swagger
@@ -111,14 +108,10 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
  *                   example:
  *                     rate-limit: ["Too many login attempts from this IP, please try again after 15 minutes"]
  */
-router.post('/users/login', loginRateLimit, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await login(req.body.user);
-    res.json({ user });
-  } catch (error) {
-    next(error);
-  }
-});
+router.post('/users/login', loginRateLimit, asyncHandler(async (req: Request, res: Response) => {
+  const user = await login(req.body.user);
+  res.json({ user });
+}));
 
 /**
  * Get current user
@@ -126,14 +119,10 @@ router.post('/users/login', loginRateLimit, async (req: Request, res: Response, 
  * @route {GET} /user
  * @returns user User
  */
-router.get('/user', auth.required, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await getCurrentUser(req.auth?.user?.id);
-    res.json({ user });
-  } catch (error) {
-    next(error);
-  }
-});
+router.get('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const user = await getCurrentUser(req.auth?.user?.id);
+  res.json({ user });
+}));
 
 /**
  * Update user
@@ -142,13 +131,9 @@ router.get('/user', auth.required, async (req: Request, res: Response, next: Nex
  * @bodyparam user User
  * @returns user User
  */
-router.put('/user', auth.required, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = await updateUser(req.body.user, req.auth?.user?.id);
-    res.json({ user });
-  } catch (error) {
-    next(error);
-  }
-});
+router.put('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
+  const user = await updateUser(req.body.user, req.auth?.user?.id);
+  res.json({ user }));
+}));
 
 export default router;
