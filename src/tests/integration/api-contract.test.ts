@@ -3,6 +3,37 @@ import express from 'express';
 import cors from 'cors';
 import * as bodyParser from 'body-parser';
 
+// Mock Prisma globally for integration tests
+jest.mock('../../prisma/prisma-client', () => {
+  const mockPrisma = {
+    article: {
+      create: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    user: {
+      create: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    comment: {
+      create: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue({}),
+    },
+    tag: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  };
+  return {
+    __esModule: true,
+    default: mockPrisma,
+  };
+});
+
 import routes from '../../app/routes/routes';
 import { globalErrorHandler, notFoundHandler } from '../../app/middleware/error-handler.middleware';
 import { setupSwagger } from '../../config/swagger';
@@ -20,21 +51,7 @@ jest.mock('../../telemetry', () => ({
   stopTelemetry: jest.fn(),
 }));
 
-jest.mock('../../prisma/prisma-client', () => ({
-  user: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  article: {
-    findMany: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-  },
-  $disconnect: jest.fn(),
-}));
+
 
 // Mock rate limiting
 jest.mock('../../app/middleware/rate-limit.middleware', () => ({
@@ -50,7 +67,7 @@ app.use('/api', routes);
 app.use('*', notFoundHandler);
 app.use(globalErrorHandler);
 
-describe.skip('API Contract Integration Tests - skipping due to server requirements', () => {
+describe('API Contract Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
