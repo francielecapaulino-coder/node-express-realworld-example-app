@@ -29,7 +29,7 @@
   "tempDirName": ".stryker-temp",
   "cleanTempDir": true,
   "timeout": 60000,
-  "maxConcurrentTestRunners": 4,
+"concurrency": 4,
   "tsconfigFile": "tsconfig.json",
   "logLevel": "info",
   
@@ -37,28 +37,17 @@
     "projectType": "custom",
     "configFile": "jest.config.ts"
   },
-
+  
   "thresholds": {
     "high": 95,
     "low": 90,
     "break": 85
   },
   
-  "mutatorOptions": {
-    "typescript": {
-      "exclude": [
-        "**/node_modules/**",
-        "**/dist/**",
-        "**/coverage/**"
-      ]
-    }
-  },
-
   "plugins": [
-    "@stryker-mutator/jest-runner",
-    "@stryker-mutator/typescript-checker"
+    "@stryker-mutator/jest-runner"
   ],
-
+  
   "ignorePatterns": [
     "*.config.js",
     "*.spec.ts", 
