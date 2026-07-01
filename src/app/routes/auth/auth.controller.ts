@@ -133,7 +133,7 @@ router.get('/user', auth.required, asyncHandler(async (req: Request, res: Respon
  */
 router.put('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
   const user = await updateUser(req.body.user, req.auth?.user?.id);
-  res.json({ user }));
+res.json({ user });
 }));
 
 export default router;

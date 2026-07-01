@@ -31,12 +31,7 @@ const router = Router();
  * @returns articles: list of articles
  */
 router.get('/articles', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-  const result = await getArticles(
-    req.query,
-    Number(req.query.offset),
-    Number(req.query.limit),
-    req.auth?.user?.id,
-  );
+const result = await getArticles(req.query, req.auth?.user?.id);
   res.json(result);
 }));
 
@@ -168,8 +163,7 @@ router.delete(
   '/articles/:slug/comments/:id',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const comment = await deleteComment(
-      req.params.slug,
+const comment = await deleteComment(
       Number(req.params.id),
       req.auth?.user?.id,
     );
@@ -188,7 +182,7 @@ router.get(
   '/articles/:slug/comments',
   auth.optional,
   asyncHandler(async (req: Request, res: Response) => {
-    const comments = await getCommentsByArticle(req.params.slug);
+const comments = await getCommentsByArticle(req.params.slug, req.auth?.user?.id);
     res.json({ comments });
   }),
 );
