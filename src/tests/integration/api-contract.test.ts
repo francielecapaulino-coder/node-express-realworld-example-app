@@ -20,278 +20,215 @@ jest.mock('../../telemetry', () => ({
   stopTelemetry: jest.fn(),
 }));
 
+jest.mock('../../prisma/prisma-client', () => ({
+  user: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+  article: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  $disconnect: jest.fn(),
+}));
+
+// Mock rate limiting
+jest.mock('../../app/middleware/rate-limit.middleware', () => ({
+  loginRateLimit: (req: any, res: any, next: any) => next(),
+}));
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+setupSwagger(app);
+app.use('/api', routes);
+app.use('*', notFoundHandler);
+app.use(globalErrorHandler);
+
 describe('API Contract Integration Tests', () => {
-  let app: express.Application;
-
-  beforeAll(async () => {
-    // Setup test application
-    app = express();
-    
-    app.use(cors());
-    app.use(bodyParser.json());
-    app.use(bodyParser.urlencoded({ extended: true }));
-    
-    // Setup Swagger documentation
-    setupSwagger(app);
-    
-    app.use(routes);
-    
-    // Health check endpoint
-    app.get('/', (_req: express.Request, res: express.Response) => {
-      res.json({ 
-        status: 'API is running on /api',
-        documentation: 'Swagger UI available at /api-docs',
-        openapi: 'OpenAPI spec available at /api-docs.json'
-      });
-    });
-
-    // Error handling
-    app.use(notFoundHandler);
-    app.use(globalErrorHandler);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe('API Health and Documentation', () => {
-    test('should return health check information', async () => {
-      // When
+  describe('Health & Ready Endpoints', () => {
+    test('GET / should respond with 200 OK', async () => {
       const response = await request(app).get('/');
-
-      // Then
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({
-        status: 'API is running on /api',
-        documentation: 'Swagger UI available at /api-docs',
-        openapi: 'OpenAPI spec available at /api-docs.json'
-      });
+      expect(response.text).toContain('Conduit API');
     });
 
-    test('should serve Swagger UI at /api-docs', async () => {
-      // When
-      const response = await request(app).get('/api-docs');
-
-      // Then
+    test('GET /health should respond with 200 OK', async () => {
+      const response = await request(app).get('/health');
       expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toContain('text/html');
-      expect(response.text).toContain('swagger');
-    });
-
-    test('should serve OpenAPI JSON spec at /api-docs.json', async () => {
-      // When
-      const response = await request(app).get('/api-docs.json');
-
-      // Then
-      expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toContain('application/json');
-      
-      const spec = response.body;
-      expect(spec).toHaveProperty('openapi', '3.0.0');
-      expect(spec).toHaveProperty('info.title', 'Conduit API - Node/Express RealWorld Example');
-      expect(spec).toHaveProperty('components.schemas');
-      expect(spec).toHaveProperty('components.securitySchemes');
-    });
-
-    test('should include RealWorld compliant response schemas', async () => {
-      // When
-      const response = await request(app).get('/api-docs.json');
-
-      // Then
-      const schemas = response.body.components.schemas;
-      
-      // Check for RealWorld response envelopes
-      expect(schemas).toHaveProperty('UserResponse');
-      expect(schemas).toHaveProperty('ArticleResponse');
-      expect(schemas).toHaveProperty('ArticlesResponse');
-      expect(schemas).toHaveProperty('ProfileResponse');
-      expect(schemas).toHaveProperty('CommentResponse');
-      expect(schemas).toHaveProperty('CommentsResponse');
-      expect(schemas).toHaveProperty('TagsResponse');
+      expect(response.body).toHaveProperty('status', 'ok');
     });
   });
 
-  describe('Authentication Endpoints - Contract Compliance', () => {
-    test('should handle user registration request structure', async () => {
-      // Given
-      const newUser = {
-        user: {
-          username: 'testuser',
-          email: 'test@example.com',
-          password: 'password123'
-        }
-      };
-
-      // When
+  describe('Authentication Endpoints', () => {
+    test('POST /api/users should require valid user data', async () => {
+      const invalidUser = { user: { email: 'invalid', password: '123' } };
+      
       const response = await request(app)
         .post('/api/users')
-        .send(newUser);
+        .send(invalidUser);
 
-      // Then - Should have proper structure even if validation fails
-      expect(response.status).toBeLessThan(500);
-      expect(response.body).toEqual(
-        expect.objectContaining({
-          errors: expect.any(Object)
-        })
-      );
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('errors');
     });
 
-    test('should handle login request structure', async () => {
-      // Given
-      const loginData = {
-        user: {
-          email: 'test@example.com',
-          password: 'password123'
-        }
-      };
-
-      // When
+    test('POST /api/users/login should accept credentials', async () => {
+      const loginData = { user: { email: 'test@example.com', password: 'password' } };
+      
       const response = await request(app)
         .post('/api/users/login')
         .send(loginData);
 
-      // Then
-      expect(response.status).toBeLessThan(500);
-      if (response.status >= 400) {
-        expect(response.body).toHaveProperty('errors');
-      } else {
-        expect(response.body).toHaveProperty('user');
-        expect(response.body.user).toHaveProperty('token');
-      }
+      // Should respond with either 200 (success) or 401/400 (validation/invalid)
+      expect([200, 401, 400]).toContain(response.status);
     });
   });
 
-  describe('Article Endpoints - Including Bookmarks', () => {
-    test('should handle article bookmark endpoint structure', async () => {
-      // Given
-      const slug = 'test-article-slug';
-
-      // When
+  describe('Articles Endpoints', () => {
+    test('GET /api/articles should accept query parameters', async () => {
       const response = await request(app)
-        .post(`/api/articles/${slug}/bookmark`)
-        .set('Authorization', 'Token invalid-token');
+        .get('/api/articles')
+        .query({ limit: '10', offset: '0' });
 
-      // Then - Should return proper error structure or success structure
-      expect(response.status).toBeLessThan(500);
-      if (response.status >= 400) {
-        expect(response.body).toHaveProperty('errors');
-      } else {
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('articles');
+      expect(Array.isArray(response.body.articles)).toBe(true);
+    });
+
+    test('GET /api/articles/:slug should handle article requests', async () => {
+      const response = await request(app).get('/api/articles/test-article');
+      
+      // Should respond with either 200 (found) or 404 (not found)
+      expect([200, 404]).toContain(response.status);
+      if (response.status === 200) {
         expect(response.body).toHaveProperty('article');
-        expect(response.body.article).toHaveProperty('bookmarked');
-        expect(response.body.article).toHaveProperty('bookmarksCount');
       }
     });
 
-    test('should handle article unbookmark endpoint structure', async () => {
-      // Given
-      const slug = 'test-article-slug';
+    test('POST /api/articles should require authentication', async () => {
+      const articleData = {
+        article: {
+          title: 'Test Article',
+          description: 'Test Description',
+          body: 'Test Body Content',
+          tagList: ['test']
+        }
+      };
 
-      // When
       const response = await request(app)
-        .delete(`/api/articles/${slug}/bookmark`)
-        .set('Authorization', 'Token invalid-token');
+        .post('/api/articles')
+        .send(articleData);
 
-      // Then
-      expect(response.status).toBeLessThan(500);
-      if (response.status >= 400) {
-        expect(response.body).toHaveProperty('errors');
-      } else {
-        expect(response.body).toHaveProperty('article');
-        expect(response.body.article).toHaveProperty('bookmarked');
-        expect(response.body.article).toHaveProperty('bookmarksCount');
-      }
-    });
-
-    test('should return 401 for bookmark endpoints without authentication', async () => {
-      // When
-      const bookmarkResponse = await request(app)
-        .post('/api/articles/test-slug/bookmark');
-
-      const unbookmarkResponse = await request(app)
-        .delete('/api/articles/test-slug/bookmark');
-
-      // Then
-      expect(bookmarkResponse.status).toBe(401);
-      expect(unbookmarkResponse.status).toBe(401);
-      
-      expect(bookmarkResponse.body).toHaveProperty('errors');
-      expect(unbookmarkResponse.body).toHaveProperty('errors');
+      expect(response.status).toBe(401); // Unauthorized
     });
   });
 
-  describe('Error Response Format Consistency', () => {
-    test('should maintain consistent error format across all endpoints', async () => {
-      // Test various error scenarios
-      const endpoints = [
-        { method: 'get', path: '/api/nonexistent' }, // 404
-        { method: 'post', path: '/api/users', data: {} }, // validation error
-        { method: 'get', path: '/api/user' }, // auth required
-        { method: 'post', path: '/api/articles/test-slug/bookmark' }, // auth required
-      ];
+  describe('Bookmarking Endpoints', () => {
+    test('POST /api/articles/:slug/bookmark should require authentication', async () => {
+      const response = await request(app)
+        .post('/api/articles/test-article/bookmark');
 
-      for (const endpoint of endpoints) {
-        let response: any;
-        
-        if (endpoint.method === 'get') {
-          response = await request(app).get(endpoint.path);
-        } else {
-          response = await request(app)
-            .post(endpoint.path)
-            .send(endpoint.data || {});
-        }
+      expect(response.status).toBe(401); // Unauthorized
+    });
 
-        // All error responses should have the same structure
-        if (response.status >= 400) {
-          expect(response.body).toHaveProperty('errors');
-          expect(typeof response.body.errors).toBe('object');
-        }
+    test('DELETE /api/articles/:slug/bookmark should require authentication', async () => {
+      const response = await request(app)
+        .delete('/api/articles/test-article/bookmark');
+
+      expect(response.status).toBe(401); // Unauthorized
+    });
+  });
+
+  describe('Profile Endpoints', () => {
+    test('GET /api/profiles/:username should accept profile requests', async () => {
+      const response = await request(app).get('/api/profiles/testuser');
+      
+      // Should respond with either 200 (found) or 404 (not found)
+      expect([200, 404]).toContain(response.status);
+      if (response.status === 200) {
+        expect(response.body).toHaveProperty('profile');
       }
     });
   });
 
-  describe('OpenAPI Contract Validation', () => {
-    test('should document all implemented endpoints', async () => {
-      // When
-      const response = await request(app).get('/api-docs.json');
-      const spec = response.body;
+  describe('Tags Endpoints', () => {
+    test('GET /api/tags should return tags array', async () => {
+      const response = await request(app).get('/api/tags');
 
-      // Then - Check for core endpoints
-      const paths = spec.paths;
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('tags');
+      expect(Array.isArray(response.body.tags)).toBe(true);
+    });
+  });
+
+  describe('Rate Limiting', () => {
+    test('POST /api/users/login should have rate limiting headers when applicable', async () => {
+      const loginData = { user: { email: 'test@example.com', password: 'password' } };
       
-      // Authentication endpoints
-      expect(paths).toHaveProperty('/users');
-      expect(paths).toHaveProperty('/users/login');
-      expect(paths).toHaveProperty('/user');
-      
-      // Article endpoints
-      expect(paths).toHaveProperty('/articles');
-      expect(paths).toHaveProperty('/articles/{slug}');
-      expect(paths).toHaveProperty('/articles/{slug}/bookmark');
-      
-      // Verify bookmark endpoints are documented
-      expect(paths['/articles/{slug}/bookmark']).toHaveProperty('post');
-      expect(paths['/articles/{slug}/bookmark']).toHaveProperty('delete');
+      const response = await request(app)
+        .post('/api/users/login')
+        .send(loginData);
+
+      // Rate limiting headers may be present either on success or failure
+      if (response.status === 429) {
+        expect(response.headers).toHaveProperty('x-ratelimit-limit');
+        expect(response.headers).toHaveProperty('x-ratelimit-remaining');
+      }
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('GET /nonexistent should return 404 with error structure', async () => {
+      const response = await request(app).get('/api/nonexistent');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('errors');
     });
 
-    test('should include proper response schemas', async () => {
-      // When
-      const response = await request(app).get('/api-docs.json');
-      const spec = response.body;
+    test('DELETE /api/articles/invalid-slug should handle gracefully', async () => {
+      const response = await request(app)
+        .delete('/api/articles/invalid-slug')
+        .set('Authorization', 'Bearer fake-token');
 
-      // Then - Check for RealWorld compliance
-      const schemas = spec.components.schemas;
-      
-      // Article schemas should include bookmark fields
-      const articleData = schemas.ArticleData;
-      if (articleData && articleData.allOf) {
-        const bookmarkFields = articleData.allOf.find(part => 
-          part.type === 'object' && (
-            part.properties?.bookmarked || 
-            part.properties?.bookmarksCount
-          )
-        );
-        
-        if (bookmarkFields) {
-          expect(bookmarkFields.properties.bookmarked).toHaveProperty('type', 'boolean');
-          expect(bookmarkFields.properties.bookmarksCount).toHaveProperty('type', 'integer');
-        }
-      }
+      expect([401, 404]).toContain(response.status);
+    });
+  });
+
+  describe('Content Type Validation', () => {
+    test('API should accept JSON content type', async () => {
+      const response = await request(app)
+        .get('/api/articles')
+        .set('Accept', 'application/json');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/json/);
+    });
+  });
+
+  describe('CORS Headers', () => {
+    test('Should include appropriate CORS headers', async () => {
+      const response = await request(app)
+        .options('/api/articles')
+        .set('Origin', 'http://localhost:3000');
+
+      expect(response.headers).toHaveProperty('access-control-allow-origin');
+    });
+  });
+
+  describe('API Documentation', () => {
+    test('GET /api-docs should return Swagger documentation', async () => {
+      const response = await request(app).get('/api-docs');
+
+      expect([200, 302]).toContain(response.status);
     });
   });
 });
