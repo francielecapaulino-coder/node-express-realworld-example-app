@@ -78,28 +78,23 @@ interface NewEndpoint {
 
 ---
 
-## Issue Tracking Workaround
+## Issue Tracking
 
-**GitHub Issues Currently Disabled**
+GitHub Issues are enabled for this repository — use them directly:
 
-Since GitHub Issues are disabled for this repository, we use a local issue tracking system:
-
-### Local Issue IDs Format:
-- Use format `LOCAL-001`, `LOCAL-002`, etc.
-- Reference in commits: `feat(scope): implement feature [LOCAL-001]`
-- Track in project management tools or shared documents
+### Workflow
+1. **PREREQUISITES:** Open an issue (using the templates in `.github/ISSUE_TEMPLATE/`) before starting work.
+2. **REQUIREMENTS:** Reference the issue number in every related commit.
+3. **CLOSURE:** Close the issue when the linked PR merges.
 
 ### Commit Reference Pattern:
 ```bash
 # Good examples:
-feat(auth): add rate limiting [LOCAL-001]
-fix(middleware): resolve async handler [LOCAL-002]
-docs(api): update swagger endpoints [LOCAL-003]
+feat(auth): add rate limiting (#12)
+fix(middleware): resolve async handler (#13)
+docs(api): update swagger endpoints (#14)
 ```
 
-### Work Items Tracking:
-1. **PREREQUISITES:** Create local issue ID before coding
-2. **REQUIREMENTS:** Reference issue ID in ALL related commits
-3. **CLOSURE:** Mark local issue as completed when merged
-
-This maintains traceability despite GitHub Issues being disabled.
+> Historical note: this repo previously had Issues disabled and used a `LOCAL-XXX` file-based
+> workaround (`docs/agent/LOCAL-ISSUES.md`). That file is now archived; it is no longer the
+> tracking system.

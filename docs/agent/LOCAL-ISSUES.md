@@ -1,12 +1,15 @@
-# 🎯 Local Issues Tracking
+# 🎯 Local Issues Tracking — ARCHIVED
 
-**Project**: Node.js Express RealWorld Example App  
-**Environment**: Node.js v18.20.8, macOS 25.5.0  
-**Objective**: Fix critical blockers and test failures  
+> **Superseded on 2026-07-03.** GitHub Issues were disabled on this repo when this file was
+> created, so a local `LOCAL-XXX` registry was used as a workaround. GitHub Issues have since
+> been enabled (`has_issues: true`) and are now the source of truth for tracking. This file is
+> kept only as a historical record of LOCAL-001..006; new work is tracked at
+> https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues.
 
-**Summary: 5 issues, 4 done (80%)** 🎯
+**Project**: Node.js Express RealWorld Example App
+**Environment**: Node.js v18.20.8, macOS 25.5.0
 
-## ✅ COMPLETED ISSUES
+## ✅ COMPLETED (historical record)
 
 | ID | Status | Title | Owner | Priority | Created | Completed |
 |----|--------|-------|--------|----------|---------|------------|
@@ -14,119 +17,27 @@
 | LOCAL-002 | ✅ DONE | Stryker Not Working in Node.js v21 | Coda | High | 2026-07-01 | 2026-07-01 |
 | LOCAL-003 | ✅ DONE | Fix Test Failures After Node.js Upgrade | Coda | High | 2026-07-01 | 2026-07-01 |
 | LOCAL-004 | ✅ DONE | Fix Integration Tests for Full Coverage | Coda | High | 2026-07-01 | 2026-07-01 |
+| LOCAL-005 | ✅ DONE | Complete E2E Tests with Playwright | Coda | Medium | 2026-07-01 | 2026-07-01 |
+| LOCAL-006 | ✅ DONE | Docker Containerization + Compose Setup | Coda | Medium | 2026-07-01 | 2026-07-01 |
 
-## 🔄 IN PROGRESS
+Note: LOCAL-006 was previously listed as "READY"/not started, but `Dockerfile`, `compose.yml`
+and `scripts/validate_docker_logs.py` were already implemented and committed — the status here
+was stale and has been corrected.
 
-| ID | Status | Title | Owner | Priority | Target | Progress |
-|----|--------|-------|--------|----------|---------|-----------|
-| LOCAL-005 | 🔄 IN_PROGRESS | Complete E2E Tests with Playwright | Coda | Medium | v18.2 | STARTING |
+## 📋 Active work — tracked as GitHub Issues
 
----
+| Issue | Title | Scope item |
+|---|---|---|
+| [#3](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/3) | Un-skip and fix contract integration tests | Integration tests for the current contract |
+| [#4](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/4) | Upgrade Express 4->5 and Nx 17->23 | Update to the most recent framework version |
+| [#5](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/5) | OpenAPI spec missing article/profile/tag routes | Document current API contract with OpenAPI/Swagger |
+| [#6](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/6) | Run Stryker to completion, report mutation score | Mutation testing, cover to 95% |
+| [#7](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/7) | Fix docker log validation script | Python script validates Docker startup/exit logs |
 
-## 📋 FUTURE ENHANCEMENTS
+Closed: [#2](https://github.com/francielecapaulino-coder/node-express-realworld-example-app/issues/2) — rate-limit integration test now triggers a real 429.
 
-| ID | Status | Title | Owner | Priority | Target |
-|----|--------|-------|--------|----------|---------|
-| LOCAL-006 | 📋 TODO | Docker Containerization + Compose Setup | Future | Medium | v18.3 |
+## Going forward
 
----
-
-## 🎯 LOCAL-005: E2E Tests with Playwright
-
-### 📋 CURRENT STATUS
-- **Foundation**: ✅ 8/9 test suites passing (89% coverage)
-- **Playwright**: ✅ Already installed & configured
-- **Target**: Complete end-to-end user journeys validation
-
-### 🎯 DEFINITION OF DONE
-
-#### ✅ FOUNDATION COMPLETE
-- ✅ Local 004: 8/9 test suites passing established
-- ✅ Application business logic validated
-- ✅ Mock infrastructure operational
-- ✅ Services stable for E2E testing
-
-#### 🚰 E2E TESTING REQUIREMENTS
-- [ ] User registration & login flows
-- [ ] Article creation & management
-- [ ] Bookmark functionality E2E validation
-- [ ] Article feed & filtering
-- [ ] Profile management
-- [ ] Error handling in user scenarios
-
-#### 📊 SUCCESS CRITERIA
-- [ ] Complete user journey coverage
-- [ ] Realistic data flows validated
-- [ ] Browser compatibility tests
-- [ ] Performance thresholds met
-- [ ] Error scenarios covered
-
-### 🔧 TECHNICAL APPROACH
-
-#### PHASE 1: User Authentication E2E
-- Registration flow testing
-- Login/logout validation  
-- Session persistence
-- Error scenarios
-
-#### PHASE 2: Content Management  
-- Article CRUD E2E
-- Bookmark functionality
-- Tag management
-- Search/filter flows
-
-#### PHASE 3: Social Features
-- Profile management
-- Follow/unfollow users
-- Comment system
-- Like/bookmark interactions
-
-### 🎯 TEST SCENARIOS TO IMPLEMENT
-
-#### 🔄 User Stories Validation
-1. **"Como usuário, quero me registrar"** → Registration E2E flow
-2. **"Como usuário, quero fazer login"** → Authentication E2E 
-3. **"Como autor, quero criar artigos"** → Article creation flow
-4. **"Como leitor, quero salvar artigos"** → Bookmark E2E validation
-5. **"Como usuário, quero editar meu perfil"** → Profile management
-
-#### 🔍 TECHNICAL VALIDATION
-- Database persistence through UI
-- API integration stability
-- Frontend validation flows
-- Error recovery scenarios
-- Performance benchmarks
-
----
-
-## 📊 STATUS OVERVIEW
-
-**Node.js Environment**: ✅ v18.20.8 production ready  
-**Foundation**: ✅ 8/9 test suites passing (89% coverage)  
-**Playwright**: ✅ Installed, configured, ready to implement  
-**Critical Path**: 🔄 LOCAL-005 in progress  
-
-### 🏆 FOUNDATION ACHIEVEMENTS
-
-1. **Stable Backend**: All core services validated
-2. **Mock Infrastructure**: Complete test environment
-3. **Business Logic**: Bookmark + article systems working
-4. **TypeScript**: Clean compilation across layers
-5. **Build System**: Stryker operational
-
-### 🚀 E2E IMPLEMENTATION PLAN
-
-**WEEK 1**: Authentication flows + basic CRUD
-**WEEK 2**: Content management + social features  
-**WEEK 3**: Performance + edge cases
-
-### 🎯 NEXT STEPS
-1. Setup E2E test infrastructure
-2. Implement user registration/login flows
-3. Validate article management E2E scenarios
-4. Complete bookmark functionality E2E testing
-5. Ready for Docker containerization (LOCAL-006)
-
----
-
-**🚀 LOCAL-005: Building on solid foundation for complete user journey validation!**
+1. Open a GitHub issue before starting work (use the templates in `.github/ISSUE_TEMPLATE/`).
+2. Reference the issue number in every commit, e.g. `fix(rate-limit): trigger real 429 in integration test (#2)`.
+3. Close the issue when the PR merges.
