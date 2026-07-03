@@ -1,8 +1,13 @@
-import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
+import { mockReset, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaClient } from '@prisma/client';
+import prisma from '../prisma/prisma-client';
 
-// Create a single mock instance with minimal typing
-const prismaMock = mockDeep<PrismaClient>() as any;
+// Resolves to the deep mock created in src/prisma/__mocks__/prisma-client.ts.
+// This only replaces the real client when the importing test file has called
+// jest.mock('../../prisma/prisma-client') (path relative to that file) —
+// without that call, `prisma` here is the real PrismaClient and every
+// service under test would try to hit a live database.
+const prismaMock = (prisma as unknown as DeepMockProxy<PrismaClient>) as any;
 
 // Setup basic mock returns - minimal configuration
 const setupBasicMocks = () => {
@@ -25,6 +30,7 @@ const setupBasicMocks = () => {
   prismaMock.comment = {
     create: jest.fn().mockResolvedValue({}),
     findMany: jest.fn().mockResolvedValue([]),
+    findFirst: jest.fn().mockResolvedValue(null),
     delete: jest.fn().mockResolvedValue({}),
   };
   

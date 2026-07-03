@@ -1,3 +1,5 @@
+jest.mock('../../prisma/prisma-client');
+
 import prismaMock from '../prisma-mock';
 import { followUser, getProfile, unfollowUser } from '../../app/routes/profile/profile.service';
 

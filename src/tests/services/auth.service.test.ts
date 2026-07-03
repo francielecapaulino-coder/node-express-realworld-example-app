@@ -1,11 +1,33 @@
+jest.mock('../../prisma/prisma-client');
+
 import * as bcrypt from 'bcryptjs';
 import { createUser, getCurrentUser, login, updateUser } from '../../app/routes/auth/auth.service';
 import prismaMock from '../prisma-mock';
 
 describe('AuthService', () => {
   describe('createUser', () => {
-test.skip('should create new user - skipping due to Prisma mock issues', async () => {
-      // TODO: Fix Prisma mock configuration
+    test('should create new user', async () => {
+      // Given
+      const user = {
+        username: 'RealWorld',
+        email: 'realworld@me',
+        password: '1234',
+      };
+
+      const mockedCreatedUser = {
+        id: 123,
+        username: 'RealWorld',
+        email: 'realworld@me',
+        bio: null,
+        image: null,
+      };
+
+      // When
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue(mockedCreatedUser);
+
+      // Then
+      await expect(createUser(user)).resolves.toHaveProperty('token');
     });
 
     test('should throw an error when creating new user with empty username ', async () => {
@@ -50,7 +72,7 @@ test.skip('should create new user - skipping due to Prisma mock issues', async (
       await expect(createUser(user)).rejects.toThrow(error);
     });
 
-test.skip('should throw an exception when creating a new user with already existing user on same username - skipping due to Prisma mock issues', async () => {
+    test('should throw an exception when creating a new user with already existing user on same username', async () => {
       // Given
       const user = {
         id: 123,
@@ -81,7 +103,7 @@ test.skip('should throw an exception when creating a new user with already exist
   });
 
 describe('login', () => {
-    test.skip('should return a token - skipping due to Prisma mock issues', async () => {
+    test('should return a token', async () => {
       // Given
       const user = {
         email: 'realworld@me',
@@ -132,7 +154,7 @@ describe('login', () => {
       await expect(login(user)).rejects.toThrow(error);
     });
 
-test.skip('should throw an error when no user is found - skipping due to Prisma mock issues', async () => {
+    test('should throw an error when no user is found', async () => {
       // Given
       const user = {
         email: 'realworld@me',
@@ -147,7 +169,7 @@ test.skip('should throw an error when no user is found - skipping due to Prisma 
       await expect(login(user)).rejects.toThrow(error);
     });
 
-test.skip('should throw an error if the password is wrong - skipping due to Prisma mock issues', async () => {
+    test('should throw an error if the password is wrong', async () => {
       // Given
       const user = {
         email: 'realworld@me',
@@ -177,7 +199,7 @@ test.skip('should throw an error if the password is wrong - skipping due to Pris
   });
 
 describe('getCurrentUser', () => {
-    test.skip('should return a token - skipping due to Prisma mock issues', async () => {
+    test('should return a token', async () => {
       // Given
       const id = 123;
 
@@ -201,7 +223,7 @@ describe('getCurrentUser', () => {
   });
 
 describe('updateUser', () => {
-    test.skip('should return a token - skipping due to Prisma mock issues', async () => {
+    test('should return a token', async () => {
       // Given
       const user = {
         id: 123,

@@ -63,11 +63,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 setupSwagger(app);
-app.use('/api', routes);
-app.use('*', notFoundHandler);
+// `routes` already mounts everything under '/api' (see app/routes/routes.ts),
+// so it must be app.use()'d directly — app.use('/api', routes) would double
+// the prefix to '/api/api/...' and 404 every real endpoint.
+app.use(routes);
+app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
-describe.skip('API Contract Integration Tests - core endpoints validated, complex routes skipped', () => {
+describe('API Contract Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -86,25 +89,29 @@ test('GET / should respond with 404 or 200 (route check)', async () => {
 
   describe('Authentication Endpoints', () => {
     test('POST /api/users should require valid user data', async () => {
+      // No username provided -> createUser rejects with a 422 validation error
+      // (see src/app/routes/auth/auth.service.ts createUser)
       const invalidUser = { user: { email: 'invalid', password: '123' } };
-      
+
       const response = await request(app)
         .post('/api/users')
         .send(invalidUser);
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
       expect(response.body).toHaveProperty('errors');
+      expect(response.body.errors).toHaveProperty('username');
     });
 
     test('POST /api/users/login should accept credentials', async () => {
       const loginData = { user: { email: 'test@example.com', password: 'password' } };
-      
+
       const response = await request(app)
         .post('/api/users/login')
         .send(loginData);
 
-      // Should respond with either 200 (success) or 401/400 (validation/invalid)
-      expect([200, 401, 400]).toContain(response.status);
+      // With the mocked Prisma client returning no user, login() rejects with
+      // 403 (see src/app/routes/auth/auth.service.ts login).
+      expect([200, 401, 403]).toContain(response.status);
     });
   });
 
@@ -243,7 +250,9 @@ test('GET / should respond with 404 or 200 (route check)', async () => {
     test('GET /api-docs should return Swagger documentation', async () => {
       const response = await request(app).get('/api-docs');
 
-      expect([200, 302]).toContain(response.status);
+      // swagger-ui-express redirects to the trailing-slash URL (301) before
+      // serving the UI (200); either is a valid "docs are mounted" signal.
+      expect([200, 301, 302]).toContain(response.status);
     });
   });
 });
