@@ -16,6 +16,7 @@ const setupBasicMocks = () => {
     create: jest.fn().mockResolvedValue({}),
     findMany: jest.fn().mockResolvedValue([]),
     findUnique: jest.fn().mockResolvedValue(null),
+    findFirst: jest.fn().mockResolvedValue(null),
     update: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
     count: jest.fn().mockResolvedValue(0),

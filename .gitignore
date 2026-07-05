@@ -48,4 +48,6 @@ Thumbs.db
 .nx/migrate-runs
 
 .stryker-temp
+/reports
 migrations.json
+__pycache__

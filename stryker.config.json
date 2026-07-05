@@ -6,30 +6,29 @@
     "progress",
     "clear-text",
     "html",
-    "json",
-    "dashboard"
+    "json"
   ],
-  "dashboard": {
-    "project": "node-express-realworld-example",
-    "version": "main",
-    "module": "api"
-  },
   "testRunner": "jest",
-  "testRunnerComment": "Use Jest as test runner for both unit and integration tests",
   "coverageAnalysis": "perTest",
+  "ignoreStatic": true,
   "mutate": [
     "src/**/*.ts",
     "!src/**/*.spec.ts",
     "!src/**/*.test.ts",
     "!src/tests/**/*",
     "!src/main.ts",
+    "!src/telemetry.ts",
+    "!src/logger.ts",
+    "!src/config/swagger.ts",
+    "!src/prisma/prisma-client.ts",
+    "!src/prisma/seed.ts",
     "!dist/**/*",
     "!node_modules/**/*"
   ],
   "tempDirName": ".stryker-temp",
   "cleanTempDir": true,
-  "timeout": 60000,
-"concurrency": 4,
+  "timeoutMS": 60000,
+  "concurrency": 4,
   "tsconfigFile": "tsconfig.json",
   "logLevel": "info",
   
@@ -49,9 +48,6 @@
   ],
   
   "ignorePatterns": [
-    "*.config.js",
-    "*.spec.ts", 
-    "*.test.ts",
     "node_modules",
     "dist",
     ".stryker-temp",
