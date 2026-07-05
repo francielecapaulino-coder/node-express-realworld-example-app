@@ -1,6 +1,5 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
-import { RateLimitRequestHandler } from 'express-rate-limit';
 
 /**
  * Rate limiting middleware for login endpoint
@@ -29,41 +28,3 @@ export const loginRateLimit = rateLimit({
     });
   }
 });
-
-/**
- * General rate limiting for all API endpoints
- * - 100 requests per minute per IP
- */
-export const generalRateLimit = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    errors: {
-      'rate-limit': [
-        'Too many requests from this IP, please try again after a minute'
-      ]
-    }
-  },
-standardHeaders: true,
-  legacyHeaders: false,
-});
-
-/**
- * Generic rate limiting middleware factory for testing
- * @param options Configuration options for rate limit
- */
-export const rateLimitMiddleware = (options: {
-  windowMs: number;
-  max: number;
-  message?: string | object;
-  standardHeaders?: boolean;
-  legacyHeaders?: boolean;
-}): RateLimitRequestHandler => {
-  return rateLimit({
-    windowMs: options.windowMs,
-    max: options.max,
-    message: options.message || 'Too many requests, please try again later.',
-    standardHeaders: options.standardHeaders || false,
-    legacyHeaders: options.legacyHeaders || true,
-  });
-};

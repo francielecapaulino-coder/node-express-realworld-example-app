@@ -6,248 +6,304 @@ import prismaMock from '../prisma-mock';
 
 describe('AuthService', () => {
   describe('createUser', () => {
-    test('should create new user', async () => {
-      // Given
-      const user = {
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-      };
-
-      const mockedCreatedUser = {
+    test('creates the user with only the required fields and returns it with a token', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue({
         id: 123,
         username: 'RealWorld',
         email: 'realworld@me',
         bio: null,
         image: null,
-      };
+      });
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(null);
-      prismaMock.user.create.mockResolvedValue(mockedCreatedUser);
+      const result = await createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' });
 
-      // Then
-      await expect(createUser(user)).resolves.toHaveProperty('token');
+      expect(prismaMock.user.findUnique).toHaveBeenNthCalledWith(1, {
+        where: { email: 'realworld@me' },
+        select: { id: true },
+      });
+      expect(prismaMock.user.findUnique).toHaveBeenNthCalledWith(2, {
+        where: { username: 'RealWorld' },
+        select: { id: true },
+      });
+      expect(prismaMock.user.create).toHaveBeenCalledWith({
+        data: {
+          username: 'RealWorld',
+          email: 'realworld@me',
+          password: expect.any(String),
+        },
+        select: { id: true, email: true, username: true, bio: true, image: true },
+      });
+      // Password must actually be hashed, never stored in plaintext
+      const createData = (prismaMock.user.create as jest.Mock).mock.calls[0][0].data;
+      expect(createData.password).not.toBe('1234');
+      expect(await bcrypt.compare('1234', createData.password)).toBe(true);
+
+      expect(result).toEqual({
+        id: 123,
+        username: 'RealWorld',
+        email: 'realworld@me',
+        bio: null,
+        image: null,
+        token: expect.any(String),
+      });
     });
 
-    test('should throw an error when creating new user with empty username ', async () => {
-      // Given
-      const user = {
-        id: 123,
-        username: ' ',
+    test('includes image/bio/demo in the create payload only when they are provided', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'realworld@me' });
+
+      await createUser({
+        username: 'RealWorld',
         email: 'realworld@me',
         password: '1234',
-      };
+        image: 'pic.png',
+        bio: 'hi',
+        demo: true,
+      });
 
-      // Then
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ image: 'pic.png', bio: 'hi', demo: true }),
+        }),
+      );
+    });
+
+    test('trims email/username/password before validating and persisting', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'realworld@me' });
+
+      await createUser({ username: '  RealWorld  ', email: '  realworld@me  ', password: '  1234  ' });
+
+      expect(prismaMock.user.findUnique).toHaveBeenNthCalledWith(1, {
+        where: { email: 'realworld@me' },
+        select: { id: true },
+      });
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ username: 'RealWorld', email: 'realworld@me' }) }),
+      );
+    });
+
+    test('throws when creating a new user with an empty username', async () => {
       const error = String({ errors: { username: ["can't be blank"] } });
-      await expect(createUser(user)).rejects.toThrow(error);
+      await expect(
+        createUser({ id: 123, username: ' ', email: 'realworld@me', password: '1234' } as any),
+      ).rejects.toThrow(error);
     });
 
-    test('should throw an error when creating new user with empty email ', async () => {
-      // Given
-      const user = {
-        id: 123,
-        username: 'RealWorld',
-        email: '  ',
-        password: '1234',
-      };
-
-      // Then
+    test('throws when creating a new user with an empty email', async () => {
       const error = String({ errors: { email: ["can't be blank"] } });
-      await expect(createUser(user)).rejects.toThrow(error);
+      await expect(
+        createUser({ id: 123, username: 'RealWorld', email: '  ', password: '1234' } as any),
+      ).rejects.toThrow(error);
     });
 
-    test('should throw an error when creating new user with empty password ', async () => {
-      // Given
-      const user = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: ' ',
-      };
-
-      // Then
+    test('throws when creating a new user with an empty password', async () => {
       const error = String({ errors: { password: ["can't be blank"] } });
-      await expect(createUser(user)).rejects.toThrow(error);
+      await expect(
+        createUser({ id: 123, username: 'RealWorld', email: 'realworld@me', password: ' ' } as any),
+      ).rejects.toThrow(error);
     });
 
-    test('should throw an exception when creating a new user with already existing user on same username', async () => {
-      // Given
-      const user = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-      };
+    test('throws a 422 with both fields when both email and username already exist', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({ id: 999 } as any);
 
-      const mockedExistingUser = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-      };
+      const error = String({
+        errors: { email: ['has already been taken'], username: ['has already been taken'] },
+      });
+      await expect(
+        createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
+      ).rejects.toThrow(error);
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
 
-// When
-      prismaMock.user.findUnique.mockResolvedValue(mockedExistingUser);
+    test('throws a 422 with only email when just the email already exists', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: 999 } as any).mockResolvedValueOnce(null);
 
-      // Then
-      const error = { email: ['has already been taken'] }.toString();
-      await expect(createUser(user)).rejects.toThrow(error);
+      const error = String({ errors: { email: ['has already been taken'] } });
+      await expect(
+        createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
+      ).rejects.toThrow(error);
+    });
+
+    test('throws a 422 with only username when just the username already exists', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 999 } as any);
+
+      const error = String({ errors: { username: ['has already been taken'] } });
+      await expect(
+        createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
+      ).rejects.toThrow(error);
     });
   });
 
-describe('login', () => {
-    test('should return a token', async () => {
-      // Given
-      const user = {
-        email: 'realworld@me',
-        password: '1234',
-      };
-
-      const hashedPassword = await bcrypt.hash(user.password, 10);
-
-      const mockedResponse = {
+  describe('login', () => {
+    test('returns a token when the email/password match, with the exact Prisma query', async () => {
+      const hashedPassword = await bcrypt.hash('1234', 10);
+      prismaMock.user.findUnique.mockResolvedValue({
         id: 123,
         username: 'RealWorld',
         email: 'realworld@me',
         password: hashedPassword,
         bio: null,
         image: null,
-        token: '',
-        demo: false,
-      };
+      });
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedResponse);
+      const result = await login({ email: 'realworld@me', password: '1234' });
 
-      // Then
-      await expect(login(user)).resolves.toHaveProperty('token');
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'realworld@me' },
+        select: { id: true, email: true, username: true, password: true, bio: true, image: true },
+      });
+      expect(result).toEqual({
+        email: 'realworld@me',
+        username: 'RealWorld',
+        bio: null,
+        image: null,
+        token: expect.any(String),
+      });
     });
 
-    test('should throw an error when the email is empty', async () => {
-      // Given
-      const user = {
-        email: ' ',
-        password: '1234',
-      };
+    test('trims email/password before looking the user up', async () => {
+      const hashedPassword = await bcrypt.hash('1234', 10);
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 123,
+        username: 'RealWorld',
+        email: 'realworld@me',
+        password: hashedPassword,
+      });
 
-      // Then
+      await login({ email: '  realworld@me  ', password: '  1234  ' });
+
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { email: 'realworld@me' } }),
+      );
+    });
+
+    test('throws when the email is empty', async () => {
       const error = String({ errors: { email: ["can't be blank"] } });
-      await expect(login(user)).rejects.toThrow(error);
+      await expect(login({ email: ' ', password: '1234' })).rejects.toThrow(error);
     });
 
-    test('should throw an error when the password is empty', async () => {
-      // Given
-      const user = {
-        email: 'realworld@me',
-        password: ' ',
-      };
-
-      // Then
+    test('throws when the password is empty', async () => {
       const error = String({ errors: { password: ["can't be blank"] } });
-      await expect(login(user)).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: ' ' })).rejects.toThrow(error);
     });
 
-    test('should throw an error when no user is found', async () => {
-      // Given
-      const user = {
-        email: 'realworld@me',
-        password: '1234',
-      };
-
-      // When
+    test('throws a 403 when no user is found for the email', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
-      // Then
       const error = String({ errors: { 'email or password': ['is invalid'] } });
-      await expect(login(user)).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: '1234' })).rejects.toThrow(error);
     });
 
-    test('should throw an error if the password is wrong', async () => {
-      // Given
-      const user = {
-        email: 'realworld@me',
-        password: '1234',
-      };
-
-      const hashedPassword = await bcrypt.hash('4321', 10);
-
-      const mockedResponse = {
+    test('throws a 403 when the password does not match', async () => {
+      const hashedPassword = await bcrypt.hash('correct-password', 10);
+      prismaMock.user.findUnique.mockResolvedValue({
         id: 123,
-        username: 'Gerome',
+        username: 'RealWorld',
         email: 'realworld@me',
         password: hashedPassword,
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-      };
+      });
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedResponse);
-
-      // Then
       const error = String({ errors: { 'email or password': ['is invalid'] } });
-      await expect(login(user)).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: 'wrong-password' })).rejects.toThrow(error);
     });
   });
 
-describe('getCurrentUser', () => {
-    test('should return a token', async () => {
-      // Given
-      const id = 123;
-
-      const mockedResponse = {
+  describe('getCurrentUser', () => {
+    test('returns the user with the exact Prisma query and a token', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
         id: 123,
         username: 'RealWorld',
         email: 'realworld@me',
-        password: '1234',
         bio: null,
         image: null,
-        token: '',
-        demo: false,
-      };
+      } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedResponse);
+      const result = await getCurrentUser(123);
 
-      // Then
-      await expect(getCurrentUser(id)).resolves.toHaveProperty('token');
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 123 },
+        select: { id: true, email: true, username: true, bio: true, image: true },
+      });
+      expect(result).toEqual({
+        id: 123,
+        username: 'RealWorld',
+        email: 'realworld@me',
+        bio: null,
+        image: null,
+        token: expect.any(String),
+      });
     });
   });
 
-describe('updateUser', () => {
-    test('should return a token', async () => {
-      // Given
-      const user = {
+  describe('updateUser', () => {
+    test('updates only the provided fields, with the exact Prisma query', async () => {
+      prismaMock.user.update.mockResolvedValue({
         id: 123,
         username: 'RealWorld',
         email: 'realworld@me',
-        password: '1234',
-      };
-
-      const mockedResponse = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
+        bio: 'new bio',
         image: null,
-        token: '',
-        demo: false,
-      };
+      } as any);
 
-// When
-      prismaMock.user.update.mockResolvedValue(mockedResponse);
+      const result = await updateUser({ bio: 'new bio' }, 123);
 
-      // Then
-      const result = await updateUser(user, user.id);
-      expect(result).toHaveProperty('token');
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: 123 },
+        data: { bio: 'new bio' },
+        select: { id: true, email: true, username: true, bio: true, image: true },
+      });
+      expect(result).toEqual({
+        id: 123,
+        username: 'RealWorld',
+        email: 'realworld@me',
+        bio: 'new bio',
+        image: null,
+        token: expect.any(String),
+      });
+    });
+
+    test('hashes the new password when one is provided', async () => {
+      prismaMock.user.update.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'realworld@me' } as any);
+
+      await updateUser({ password: 'new-password' }, 123);
+
+      const updateData = (prismaMock.user.update as jest.Mock).mock.calls[0][0].data;
+      expect(updateData.password).not.toBe('new-password');
+      expect(await bcrypt.compare('new-password', updateData.password)).toBe(true);
+    });
+
+    test('sends an empty data payload when no fields are provided', async () => {
+      prismaMock.user.update.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'realworld@me' } as any);
+
+      await updateUser({}, 123);
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: 123 },
+        data: {},
+        select: { id: true, email: true, username: true, bio: true, image: true },
+      });
+    });
+
+    test('updates all fields at once when all are provided', async () => {
+      prismaMock.user.update.mockResolvedValue({ id: 123, username: 'newname', email: 'new@me' } as any);
+
+      await updateUser(
+        { email: 'new@me', username: 'newname', password: 'new-password', image: 'new.png', bio: 'new bio' },
+        123,
+      );
+
+      const updateData = (prismaMock.user.update as jest.Mock).mock.calls[0][0].data;
+      expect(updateData).toEqual(
+        expect.objectContaining({
+          email: 'new@me',
+          username: 'newname',
+          image: 'new.png',
+          bio: 'new bio',
+          password: expect.any(String),
+        }),
+      );
     });
   });
 });

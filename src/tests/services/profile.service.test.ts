@@ -5,142 +5,93 @@ import { followUser, getProfile, unfollowUser } from '../../app/routes/profile/p
 
 describe('ProfileService', () => {
   describe('getProfile', () => {
-    test('should return a following property', async () => {
-      // Given
-      const username = 'RealWorld';
-      const id = 123;
-
-      const mockedResponse = {
-        id: 123,
+    test('returns the mapped profile, with the exact Prisma query', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
         username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-        followedBy: [],
-      };
+        bio: 'hi',
+        image: 'pic.png',
+        followedBy: [{ id: 123 }],
+      } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedResponse);
+      const result = await getProfile('RealWorld', 123);
 
-      // Then
-      await expect(getProfile(username, id)).resolves.toHaveProperty('following');
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { username: 'RealWorld' },
+        include: { followedBy: true },
+      });
+      expect(result).toEqual({ username: 'RealWorld', bio: 'hi', image: 'pic.png', following: true });
     });
 
-    test('should throw an error if no user is found', async () => {
-      // Given
-      const username = 'RealWorld';
-      const id = 123;
+    test('following is false when the current user does not follow the profile', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        username: 'RealWorld',
+        bio: null,
+        image: null,
+        followedBy: [],
+      } as any);
 
-      // When
+      const result = await getProfile('RealWorld', 123);
+
+      expect(result).toHaveProperty('following', false);
+    });
+
+    test('following is false when no user id is given (unauthenticated request)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        username: 'RealWorld',
+        bio: null,
+        image: null,
+        followedBy: [{ id: 123 }],
+      } as any);
+
+      const result = await getProfile('RealWorld');
+
+      expect(result).toHaveProperty('following', false);
+    });
+
+    test('throws a 404 when no profile is found', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
-      // Then
-      await expect(getProfile(username, id)).rejects.toThrow();
+      await expect(getProfile('missing-user', 123)).rejects.toThrow();
     });
   });
 
   describe('followUser', () => {
-    test('shoud return a following property', async () => {
-      // Given
-      const usernamePayload = 'AnotherUser';
-      const id = 123;
-
-      const mockedAuthUser = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-        followedBy: [],
-      };
-
-      const mockedResponse = {
-        id: 123,
+    test('connects the current user and returns the mapped, followed profile', async () => {
+      prismaMock.user.update.mockResolvedValue({
         username: 'AnotherUser',
-        email: 'another@me',
-        password: '1234',
         bio: null,
         image: null,
-        token: '',
-        demo: false,
-        followedBy: [],
-      };
+        followedBy: [{ id: 123 }],
+      } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedAuthUser);
-      prismaMock.user.update.mockResolvedValue(mockedResponse);
+      const result = await followUser('AnotherUser', 123);
 
-      // Then
-      await expect(followUser(usernamePayload, id)).resolves.toHaveProperty('following');
-    });
-
-    test('shoud throw an error if no user is found', async () => {
-      // Given
-      const usernamePayload = 'AnotherUser';
-      const id = 123;
-
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(null);
-
-      // Then
-      await expect(followUser(usernamePayload, id)).rejects.toThrow();
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { username: 'AnotherUser' },
+        data: { followedBy: { connect: { id: 123 } } },
+        include: { followedBy: true },
+      });
+      expect(result).toEqual({ username: 'AnotherUser', bio: null, image: null, following: true });
     });
   });
 
   describe('unfollowUser', () => {
-    test('shoud return a following property', async () => {
-      // Given
-      const usernamePayload = 'AnotherUser';
-      const id = 123;
-
-      const mockedAuthUser = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-        followedBy: [],
-      };
-
-      const mockedResponse = {
-        id: 123,
+    test('disconnects the current user and returns the mapped, unfollowed profile', async () => {
+      prismaMock.user.update.mockResolvedValue({
         username: 'AnotherUser',
-        email: 'another@me',
-        password: '1234',
         bio: null,
         image: null,
-        token: '',
-        demo: false,
         followedBy: [],
-      };
+      } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedAuthUser);
-      prismaMock.user.update.mockResolvedValue(mockedResponse);
+      const result = await unfollowUser('AnotherUser', 123);
 
-      // Then
-      await expect(unfollowUser(usernamePayload, id)).resolves.toHaveProperty('following');
-    });
-
-    test('shoud throw an error if no user is found', async () => {
-      // Given
-      const usernamePayload = 'AnotherUser';
-      const id = 123;
-
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(null);
-
-      // Then
-      await expect(unfollowUser(usernamePayload, id)).rejects.toThrow();
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { username: 'AnotherUser' },
+        data: { followedBy: { disconnect: { id: 123 } } },
+        include: { followedBy: true },
+      });
+      expect(result).toEqual({ username: 'AnotherUser', bio: null, image: null, following: false });
     });
   });
 });
