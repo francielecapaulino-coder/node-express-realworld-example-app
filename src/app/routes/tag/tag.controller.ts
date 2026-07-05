@@ -6,10 +6,20 @@ import getTags from './tag.service';
 const router = Router();
 
 /**
- * Get top 10 popular tags
- * @auth optional
- * @route {GET} /api/tags
- * @returns tags list of tag names
+ * @swagger
+ * /tags:
+ *   get:
+ *     tags:
+ *       - Tags
+ *     summary: Get popular tags
+ *     description: Returns the list of most popular tag names
+ *     responses:
+ *       200:
+ *         description: List of tags
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TagsResponse'
  */
 router.get('/tags', auth.optional, asyncHandler(async (req: Request, res: Response) => {
   const tags = await getTags(req.auth?.user?.id);

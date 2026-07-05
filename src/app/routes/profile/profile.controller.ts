@@ -6,11 +6,28 @@ import { followUser, getProfile, unfollowUser } from './profile.service';
 const router = Router();
 
 /**
- * Get profile
- * @auth optional
- * @route {GET} /profiles/:username
- * @param username string
- * @returns profile
+ * @swagger
+ * /profiles/{username}:
+ *   get:
+ *     tags:
+ *       - Profile
+ *     summary: Get a profile
+ *     description: Get a user's profile by username. Auth is optional; when present, the response reflects whether the current user follows this profile.
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Profile found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProfileResponse'
+ *       404:
+ *         description: Profile not found
  */
 router.get(
   '/profiles/:username',
@@ -22,11 +39,31 @@ router.get(
 );
 
 /**
- * Follow user
- * @auth required
- * @route {POST} /profiles/:username/follow
- * @param username string
- * @returns profile
+ * @swagger
+ * /profiles/{username}/follow:
+ *   post:
+ *     tags:
+ *       - Profile
+ *     summary: Follow a user
+ *     security:
+ *       - TokenAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Now following this profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProfileResponse'
+ *       401:
+ *         description: Missing or invalid authorization credentials
+ *       404:
+ *         description: Profile not found
  */
 router.post(
   '/profiles/:username/follow',
@@ -38,11 +75,31 @@ router.post(
 );
 
 /**
- * Unfollow user
- * @auth required
- * @route {DELETE} /profiles/:username/follow
- * @param username string
- * @returns profiles
+ * @swagger
+ * /profiles/{username}/follow:
+ *   delete:
+ *     tags:
+ *       - Profile
+ *     summary: Unfollow a user
+ *     security:
+ *       - TokenAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: No longer following this profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProfileResponse'
+ *       401:
+ *         description: Missing or invalid authorization credentials
+ *       404:
+ *         description: Profile not found
  */
 router.delete(
   '/profiles/:username/follow',

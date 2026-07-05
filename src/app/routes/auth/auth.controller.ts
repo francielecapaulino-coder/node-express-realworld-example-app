@@ -114,10 +114,23 @@ router.post('/users/login', loginRateLimit, asyncHandler(async (req: Request, re
 }));
 
 /**
- * Get current user
- * @auth required
- * @route {GET} /user
- * @returns user User
+ * @swagger
+ * /user:
+ *   get:
+ *     tags:
+ *       - Authentication
+ *     summary: Get the current user
+ *     security:
+ *       - TokenAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       401:
+ *         description: Missing or invalid authorization credentials
  */
 router.get('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
   const user = await getCurrentUser(req.auth?.user?.id);
@@ -125,11 +138,36 @@ router.get('/user', auth.required, asyncHandler(async (req: Request, res: Respon
 }));
 
 /**
- * Update user
- * @auth required
- * @route {PUT} /user
- * @bodyparam user User
- * @returns user User
+ * @swagger
+ * /user:
+ *   put:
+ *     tags:
+ *       - Authentication
+ *     summary: Update the current user
+ *     security:
+ *       - TokenAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user:
+ *                 $ref: '#/components/schemas/User'
+ *             required:
+ *               - user
+ *     responses:
+ *       200:
+ *         description: User updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       401:
+ *         description: Missing or invalid authorization credentials
+ *       422:
+ *         description: Validation error
  */
 router.put('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
   const user = await updateUser(req.body.user, req.auth?.user?.id);
