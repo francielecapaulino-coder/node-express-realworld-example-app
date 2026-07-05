@@ -23,7 +23,6 @@ describe('ProfileService', () => {
       };
 
       // When
-      // @ts-ignore
       prismaMock.user.findUnique.mockResolvedValue(mockedResponse);
 
       // Then
@@ -39,7 +38,7 @@ describe('ProfileService', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       // Then
-      await expect(getProfile(username, id)).rejects.toThrowError();
+      await expect(getProfile(username, id)).rejects.toThrow();
     });
   });
 
@@ -90,7 +89,7 @@ describe('ProfileService', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       // Then
-      await expect(followUser(usernamePayload, id)).rejects.toThrowError();
+      await expect(followUser(usernamePayload, id)).rejects.toThrow();
     });
   });
 
@@ -141,7 +140,7 @@ describe('ProfileService', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       // Then
-      await expect(unfollowUser(usernamePayload, id)).rejects.toThrowError();
+      await expect(unfollowUser(usernamePayload, id)).rejects.toThrow();
     });
   });
 });

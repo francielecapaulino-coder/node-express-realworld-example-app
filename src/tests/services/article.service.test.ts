@@ -15,11 +15,10 @@ describe('ArticleService', () => {
       const idUser = 456;
 
       // When
-      // @ts-ignore
       prismaMock.comment.findFirst.mockResolvedValue(null);
 
       // Then
-      expect(deleteComment(id, idUser)).rejects.toThrowError();
+      expect(deleteComment(id, idUser)).rejects.toThrow();
     });
   });
 
@@ -60,9 +59,7 @@ describe('ArticleService', () => {
       };
 
       // When
-      // @ts-ignore
       prismaMock.user.findUnique.mockResolvedValue(mockedUserResponse);
-      // @ts-ignore
       prismaMock.article.update.mockResolvedValue(mockedArticleResponse);
 
       // Then
@@ -81,7 +78,7 @@ describe('ArticleService', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       // Then
-      await expect(favoriteArticle(slug, id)).rejects.toThrowError();
+      await expect(favoriteArticle(slug, id)).rejects.toThrow();
     });
   });
   describe('unfavoriteArticle', () => {
@@ -140,7 +137,7 @@ describe('ArticleService', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       // Then
-      await expect(unfavoriteArticle(slug, id)).rejects.toThrowError();
+      await expect(unfavoriteArticle(slug, id)).rejects.toThrow();
     });
   });
 });

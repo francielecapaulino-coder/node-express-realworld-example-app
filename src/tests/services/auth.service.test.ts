@@ -93,7 +93,6 @@ describe('AuthService', () => {
       };
 
 // When
-      // @ts-ignore
       prismaMock.user.findUnique.mockResolvedValue(mockedExistingUser);
 
       // Then
@@ -244,7 +243,6 @@ describe('updateUser', () => {
       };
 
 // When
-      // @ts-ignore
       prismaMock.user.update.mockResolvedValue(mockedResponse);
 
       // Then

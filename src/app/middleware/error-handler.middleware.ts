@@ -6,7 +6,9 @@ import logger from '../../logger';
  * Centralized async error handling middleware
  * Replaces try/catch blocks in route handlers
  */
-export const asyncHandler = (fn: Function) => {
+type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
+
+export const asyncHandler = (fn: AsyncRequestHandler) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
