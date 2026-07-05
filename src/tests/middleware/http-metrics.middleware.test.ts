@@ -4,6 +4,32 @@ jest.mock('../../logger', () => ({
   error: jest.fn(),
 }));
 
+// The middleware creates its OTel instruments once at module load time via
+// meter.createCounter/createHistogram/createUpDownCounter. Mock the meter so
+// every counter/histogram is a distinct jest.fn() we can assert call args on
+// — the real @opentelemetry/api meter (no SDK configured in tests) is a
+// no-op that swallows arguments, which is why every `.add()`/`.record()`
+// call site previously had zero coverage.
+const mockInstruments: Record<string, { add?: jest.Mock; record?: jest.Mock }> = {};
+jest.mock('@opentelemetry/api', () => ({
+  metrics: {
+    getMeter: () => ({
+      createCounter: (name: string) => {
+        mockInstruments[name] = { add: jest.fn() };
+        return mockInstruments[name];
+      },
+      createHistogram: (name: string) => {
+        mockInstruments[name] = { record: jest.fn() };
+        return mockInstruments[name];
+      },
+      createUpDownCounter: (name: string) => {
+        mockInstruments[name] = { add: jest.fn() };
+        return mockInstruments[name];
+      },
+    }),
+  },
+}));
+
 import { Request, Response } from 'express';
 import logger from '../../logger';
 import {
@@ -37,10 +63,14 @@ const buildRes = (): Response => {
   return res as unknown as Response;
 };
 
+const end = (res: Response, ...args: unknown[]) =>
+  (res.end as unknown as (...a: unknown[]) => void)(...args);
+
 describe('httpMetricsMiddleware', () => {
   beforeEach(() => {
     resetMetrics();
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   test('calls next() synchronously', () => {
@@ -61,9 +91,82 @@ describe('httpMetricsMiddleware', () => {
 
     expect(getMetricsData().totalRequests).toBe(1);
     expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'GET', url: '/api/articles' }),
+      {
+        method: 'GET',
+        url: '/api/articles',
+        userAgent: 'jest-agent',
+        ip: '127.0.0.1',
+        requestId: undefined,
+      },
       '[HTTP_METRICS] Request started',
     );
+  });
+
+  test('increments the same endpoint key across repeated requests instead of resetting it', () => {
+    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
+    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
+
+    expect(getMetricsData().endpointCounts.get('GET /api/articles')).toBe(2);
+  });
+
+  test('falls back to req.path when req.route is not set (e.g. unmatched routes)', () => {
+    const req = buildReq({ route: undefined, path: '/unmatched' });
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+
+    expect(getMetricsData().endpointCounts.get('GET /unmatched')).toBe(1);
+    expect(mockInstruments['http_requests_total'].add).toHaveBeenCalledWith(1, {
+      method: 'GET',
+      route: '/unmatched',
+      status_code: 'pending',
+    });
+  });
+
+  test('increments activeGauge on start and decrements it on completion', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledWith(1);
+
+    end(res);
+    expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledWith(-1);
+  });
+
+  test('records the pending request counter and endpoint counter with the exact labels', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+
+    expect(mockInstruments['http_requests_total'].add).toHaveBeenCalledWith(1, {
+      method: 'GET',
+      route: '/api/articles',
+      status_code: 'pending',
+    });
+    expect(mockInstruments['http_requests_endpoint_total'].add).toHaveBeenCalledWith(1, {
+      method: 'GET',
+      endpoint: 'GET /api/articles',
+    });
+  });
+
+  test('computes duration from Date.now() deltas and records it on the histogram', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(1_500);
+
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    end(res);
+
+    expect(getMetricsData().totalResponseTime).toBe(0.5);
+    expect(mockInstruments['http_request_duration_seconds'].record).toHaveBeenCalledWith(0.5, {
+      method: 'GET',
+      route: '/api/articles',
+      status_code: '200',
+    });
   });
 
   test('records a successful completion (status < 400) without bumping errorCount', () => {
@@ -72,10 +175,11 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 200;
-    (res.end as unknown as (...args: unknown[]) => void)();
+    end(res);
 
     const data = getMetricsData();
     expect(data.errorCount).toBe(0);
+    expect(mockInstruments['http_requests_errors_total'].add).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ statusCode: 200 }),
       '[HTTP_METRICS] Request completed',
@@ -88,14 +192,41 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 404;
-    (res.end as unknown as (...args: unknown[]) => void)();
+    end(res);
 
     const data = getMetricsData();
     expect(data.errorCount).toBe(1);
+    expect(mockInstruments['http_requests_errors_total'].add).toHaveBeenCalledWith(1, {
+      method: 'GET',
+      route: '/api/articles',
+      status_code: 404,
+    });
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ statusCode: 404, errorCount: 1 }),
       '[HTTP_METRICS] Request completed',
     );
+  });
+
+  test('a status of exactly 400 counts as an error (boundary is inclusive)', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    res.statusCode = 400;
+    end(res);
+
+    expect(getMetricsData().errorCount).toBe(1);
+  });
+
+  test('a status of 399 does not count as an error (boundary is exclusive below 400)', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    res.statusCode = 399;
+    end(res);
+
+    expect(getMetricsData().errorCount).toBe(0);
   });
 
   test('decrements active connections back to 0 once the response ends', () => {
@@ -105,7 +236,7 @@ describe('httpMetricsMiddleware', () => {
     httpMetricsMiddleware(req, res, jest.fn());
     expect(getMetricsData().activeConnections).toBe(1);
 
-    (res.end as unknown as (...args: unknown[]) => void)();
+    end(res);
     expect(getMetricsData().activeConnections).toBe(0);
   });
 
@@ -115,7 +246,7 @@ describe('httpMetricsMiddleware', () => {
     const originalEnd = res.end;
 
     httpMetricsMiddleware(req, res, jest.fn());
-    (res.end as unknown as (...args: unknown[]) => void)('body', 'utf-8');
+    end(res, 'body', 'utf-8');
 
     expect(originalEnd).toHaveBeenCalledWith('body', 'utf-8');
   });
@@ -130,16 +261,24 @@ describe('getMetricsData', () => {
     expect(getMetricsData().averageResponseTime).toBe(0);
   });
 
-  test('averageResponseTime is computed from totalResponseTime / totalRequests', () => {
-    const req = buildReq();
-    const res = buildRes();
+  test('averageResponseTime is totalResponseTime divided by totalRequests', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(0).mockReturnValueOnce(1000); // request 1: 1s
+    const res1 = buildRes();
+    httpMetricsMiddleware(buildReq(), res1, jest.fn());
+    end(res1);
+    nowSpy.mockRestore();
 
-    httpMetricsMiddleware(req, res, jest.fn());
-    (res.end as unknown as (...args: unknown[]) => void)();
+    const nowSpy2 = jest.spyOn(Date, 'now');
+    nowSpy2.mockReturnValueOnce(2000).mockReturnValueOnce(2500); // request 2: 0.5s
+    const res2 = buildRes();
+    httpMetricsMiddleware(buildReq(), res2, jest.fn());
+    end(res2);
+    nowSpy2.mockRestore();
 
     const data = getMetricsData();
-    expect(data.totalRequests).toBe(1);
-    expect(data.averageResponseTime).toBeGreaterThanOrEqual(0);
+    expect(data.totalRequests).toBe(2);
+    expect(data.averageResponseTime).toBeCloseTo((1 + 0.5) / 2, 5);
   });
 });
 
@@ -163,8 +302,7 @@ describe('metricsHandler', () => {
     resetMetrics();
   });
 
-  test('responds with a healthy metrics payload', async () => {
-    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
+  test('responds with a healthy metrics payload, errorRate 0% when there are no requests', async () => {
     const res = buildRes();
 
     await metricsHandler({} as Request, res);
@@ -173,11 +311,37 @@ describe('metricsHandler', () => {
       expect.objectContaining({
         service: 'conduit-api',
         status: 'healthy',
-        metrics: expect.objectContaining({
-          totalRequests: 1,
-        }),
+        metrics: expect.objectContaining({ totalRequests: 0, errorRate: '0%' }),
       }),
     );
+  });
+
+  test('computes errorRate as a percentage when there have been requests and errors', async () => {
+    const req = buildReq();
+    const okRes = buildRes();
+    httpMetricsMiddleware(req, okRes, jest.fn());
+    end(okRes);
+
+    const errReq = buildReq();
+    const errRes = buildRes();
+    httpMetricsMiddleware(errReq, errRes, jest.fn());
+    errRes.statusCode = 500;
+    end(errRes);
+
+    const res = buildRes();
+    await metricsHandler({} as Request, res);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metrics: expect.objectContaining({ totalRequests: 2, errorCount: 1, errorRate: '50.00%' }),
+      }),
+    );
+  });
+
+  test('logs that health metrics were served', async () => {
+    await metricsHandler({} as Request, buildRes());
+
+    expect(logger.info).toHaveBeenCalledWith('[METRICS] Health metrics served');
   });
 });
 
@@ -186,13 +350,37 @@ describe('prometheusMetricsHandler', () => {
     resetMetrics();
   });
 
-  test('responds with Prometheus text exposition format', async () => {
-    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
+  test('responds with the exact Prometheus text exposition format', async () => {
     const res = buildRes();
 
     await prometheusMetricsHandler({} as Request, res);
 
     expect(res.set).toHaveBeenCalledWith('Content-Type', 'text/plain; version=0.0.4');
-    expect(res.send).toHaveBeenCalledWith(expect.stringContaining('http_requests_total 1'));
+    expect(res.send).toHaveBeenCalledWith(
+      [
+        '# HELP http_requests_total Total number of HTTP requests',
+        '# TYPE http_requests_total counter',
+        'http_requests_total 0',
+        '',
+        '# HELP http_requests_errors_total Total number of HTTP errors',
+        '# TYPE http_requests_errors_total counter',
+        'http_requests_errors_total 0',
+        '',
+        '# HELP http_active_connections Number of active HTTP connections',
+        '# TYPE http_active_connections gauge',
+        'http_active_connections 0',
+        '',
+        '# HELP http_request_duration_seconds HTTP request duration in seconds',
+        '# TYPE http_request_duration_seconds histogram',
+        'http_request_duration_seconds_sum 0',
+        'http_request_duration_seconds_count 0',
+      ].join('\n'),
+    );
+  });
+
+  test('logs that Prometheus metrics were served', async () => {
+    await prometheusMetricsHandler({} as Request, buildRes());
+
+    expect(logger.info).toHaveBeenCalledWith('[METRICS] Prometheus metrics served');
   });
 });

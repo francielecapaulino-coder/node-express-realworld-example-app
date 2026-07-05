@@ -1,6 +1,13 @@
+jest.mock('../../logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+}));
+
 import { Request, Response, NextFunction } from 'express';
-import { asyncHandler, globalErrorHandler } from '../../app/middleware/error-handler.middleware';
+import { asyncHandler, globalErrorHandler, notFoundHandler } from '../../app/middleware/error-handler.middleware';
 import HttpException from '../../app/models/http-exception.model';
+import logger from '../../logger';
 
 describe('Error Handler Integration Tests', () => {
   let mockRequest: Partial<Request>;
@@ -99,6 +106,71 @@ test('should handle HttpException properly', () => {
       });
     });
 
+    test('should handle Prisma known-request errors with 400 status', () => {
+      const prismaError = new Error('Unique constraint failed');
+      prismaError.name = 'PrismaClientKnownRequestError';
+
+      globalErrorHandler(prismaError, mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        errors: { database: ['invalid data provided'] },
+      });
+    });
+
+    test('should handle Prisma initialization errors with 503 status', () => {
+      const prismaError = new Error('Cannot reach database server');
+      prismaError.name = 'PrismaClientInitializationError';
+
+      globalErrorHandler(prismaError, mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(503);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        errors: { database: ['service unavailable'] },
+      });
+    });
+
+    test('should handle validation errors with 422 status and include the message', () => {
+      const validationError = new Error('username is required');
+      validationError.name = 'ValidationError';
+
+      globalErrorHandler(validationError, mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(422);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        errors: { validation: ['username is required'] },
+      });
+    });
+
+    test('should handle rate-limit errors with 429 status and include the message', () => {
+      const rateLimitError = new Error('Too many requests from this IP');
+
+      globalErrorHandler(rateLimitError, mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(429);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        errors: { 'rate-limit': ['Too many requests from this IP'] },
+      });
+    });
+
+    test('logs the failure with the request context before responding', () => {
+      const error = new Error('boom');
+      error.stack = 'fake-stack';
+
+      globalErrorHandler(error, mockRequest as Request, mockResponse as Response, nextFunction);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        {
+          error: 'boom',
+          stack: 'fake-stack',
+          url: '/api/test',
+          method: 'GET',
+          ip: '127.0.0.1',
+        },
+        'Request failed',
+      );
+    });
+
     test('should handle generic errors with 500 status', () => {
       // Given
       const genericError = new Error('Something went wrong');
@@ -155,6 +227,21 @@ errorCases.forEach(({ error, expectedCode }) => {
             })
           );
         }
+      });
+    });
+  });
+
+  describe('notFoundHandler', () => {
+    test('responds with 404 and the exact method/path in the message', () => {
+      const req = { method: 'POST', path: '/api/unknown-route' } as Request;
+
+      notFoundHandler(req, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        errors: {
+          route: ['Route POST /api/unknown-route not found'],
+        },
       });
     });
   });

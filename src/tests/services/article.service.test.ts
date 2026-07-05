@@ -17,14 +17,34 @@ import {
   updateArticle,
 } from '../../app/routes/article/article.service';
 
+// Mirrors the `include` clause article.service.ts actually sends to Prisma for
+// favorite-oriented queries (getArticles/getFeed/getArticle/createArticle/
+// updateArticle/favoriteArticle/unfavoriteArticle). Asserting against this
+// exactly (rather than expect.objectContaining) is what catches mutations
+// inside the include/select object literals themselves.
+const ARTICLE_INCLUDE = {
+  tagList: { select: { name: true } },
+  author: { select: { username: true, bio: true, image: true, followedBy: true } },
+  favoritedBy: true,
+  _count: { select: { favoritedBy: true } },
+};
+
+// bookmarkArticle/unbookmarkArticle use the same shape but for bookmarks.
+const BOOKMARK_INCLUDE = {
+  tagList: { select: { name: true } },
+  author: { select: { username: true, bio: true, image: true, followedBy: true } },
+  bookmarkedBy: true,
+  _count: { select: { bookmarkedBy: true } },
+};
+
 const mockedArticle = {
   id: 123,
   slug: 'how-to-train-your-dragon-1',
   title: 'How to train your dragon',
   description: 'desc',
   body: 'body',
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2024-01-02T00:00:00.000Z'),
   authorId: 456,
   tagList: [{ name: 'dragons' }],
   favoritedBy: [],
@@ -38,60 +58,71 @@ const mockedArticle = {
   },
 };
 
+const mappedAuthor = { username: 'RealWorld', bio: null, image: null, following: false };
+
 describe('ArticleService', () => {
   describe('getArticles', () => {
     test('returns a mapped list of articles with the total count', async () => {
-      // Given
       prismaMock.article.count.mockResolvedValue(1);
       prismaMock.article.findMany.mockResolvedValue([mockedArticle]);
 
-      // When
       const result = await getArticles({}, 1);
 
-      // Then
       expect(result.articlesCount).toBe(1);
-      expect(result.articles).toHaveLength(1);
-      expect(result.articles[0]).toHaveProperty('slug', mockedArticle.slug);
+      expect(result.articles).toEqual([
+        {
+          slug: mockedArticle.slug,
+          title: mockedArticle.title,
+          description: mockedArticle.description,
+          body: mockedArticle.body,
+          tagList: ['dragons'],
+          createdAt: mockedArticle.createdAt,
+          updatedAt: mockedArticle.updatedAt,
+          favorited: false,
+          favoritesCount: 0,
+          author: mappedAuthor,
+        },
+      ]);
     });
 
-    test('applies tag/author/favorited query filters without throwing', async () => {
-      prismaMock.article.count.mockResolvedValue(0);
-      prismaMock.article.findMany.mockResolvedValue([]);
-
-      const result = await getArticles(
-        { tag: 'dragons', author: 'RealWorld', favorited: 'RealWorld', offset: '5', limit: '2' },
-        1,
-      );
-
-      expect(result.articlesCount).toBe(0);
-      expect(result.articles).toEqual([]);
-    });
-
-    test('builds the exact Prisma where/order/pagination clause', async () => {
+    test('builds the exact Prisma where/order/pagination/include clause with all filters', async () => {
       prismaMock.article.count.mockResolvedValue(0);
       prismaMock.article.findMany.mockResolvedValue([]);
 
       await getArticles({ tag: 'dragons', author: 'RealWorld', favorited: 'RealWorld', offset: '5', limit: '2' }, 1);
 
-      expect(prismaMock.article.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            AND: [
-              {
-                author: {
-                  OR: [{ demo: { equals: true } }, { id: { equals: 1 } }],
-                  AND: [{ username: { equals: 'RealWorld' } }],
-                },
+      expect(prismaMock.article.count).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            {
+              author: {
+                OR: [{ demo: { equals: true } }, { id: { equals: 1 } }],
+                AND: [{ username: { equals: 'RealWorld' } }],
               },
-              { tagList: { some: { name: 'dragons' } } },
-              { favoritedBy: { some: { username: { equals: 'RealWorld' } } } },
-            ],
-          },
-          orderBy: { createdAt: 'desc' },
-          skip: 5,
-          take: 2,
-        }),
-      );
+            },
+            { tagList: { some: { name: 'dragons' } } },
+            { favoritedBy: { some: { username: { equals: 'RealWorld' } } } },
+          ],
+        },
+      });
+      expect(prismaMock.article.findMany).toHaveBeenCalledWith({
+        where: {
+          AND: [
+            {
+              author: {
+                OR: [{ demo: { equals: true } }, { id: { equals: 1 } }],
+                AND: [{ username: { equals: 'RealWorld' } }],
+              },
+            },
+            { tagList: { some: { name: 'dragons' } } },
+            { favoritedBy: { some: { username: { equals: 'RealWorld' } } } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: 5,
+        take: 2,
+        include: ARTICLE_INCLUDE,
+      });
     });
 
     test('defaults to skip 0 / take 10 and only the demo OR clause when no filters or id are given', async () => {
@@ -100,18 +131,18 @@ describe('ArticleService', () => {
 
       await getArticles({});
 
-      expect(prismaMock.article.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { AND: [{ author: { OR: [{ demo: { equals: true } }], AND: [] } }] },
-          skip: 0,
-          take: 10,
-        }),
-      );
+      expect(prismaMock.article.findMany).toHaveBeenCalledWith({
+        where: { AND: [{ author: { OR: [{ demo: { equals: true } }], AND: [] } }] },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 10,
+        include: ARTICLE_INCLUDE,
+      });
     });
   });
 
   describe('getFeed', () => {
-    test('returns articles authored by users the current user follows', async () => {
+    test('returns a mapped list of articles with the total count', async () => {
       prismaMock.article.count.mockResolvedValue(1);
       prismaMock.article.findMany.mockResolvedValue([mockedArticle]);
 
@@ -119,9 +150,12 @@ describe('ArticleService', () => {
 
       expect(result.articlesCount).toBe(1);
       expect(result.articles).toHaveLength(1);
+      expect(result.articles[0]).toEqual(
+        expect.objectContaining({ slug: mockedArticle.slug, tagList: ['dragons'] }),
+      );
     });
 
-    test('builds the exact Prisma where/order/pagination clause', async () => {
+    test('builds the exact Prisma where/order/pagination/include clause', async () => {
       prismaMock.article.count.mockResolvedValue(0);
       prismaMock.article.findMany.mockResolvedValue([]);
 
@@ -129,14 +163,13 @@ describe('ArticleService', () => {
 
       const expectedWhere = { author: { followedBy: { some: { id: 1 } } } };
       expect(prismaMock.article.count).toHaveBeenCalledWith({ where: expectedWhere });
-      expect(prismaMock.article.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expectedWhere,
-          orderBy: { createdAt: 'desc' },
-          skip: 3,
-          take: 7,
-        }),
-      );
+      expect(prismaMock.article.findMany).toHaveBeenCalledWith({
+        where: expectedWhere,
+        orderBy: { createdAt: 'desc' },
+        skip: 3,
+        take: 7,
+        include: ARTICLE_INCLUDE,
+      });
     });
 
     test('defaults to skip 0 / take 10 when offset/limit are falsy', async () => {
@@ -154,14 +187,52 @@ describe('ArticleService', () => {
   describe('createArticle', () => {
     const validArticle = { title: 'How to train your dragon', description: 'desc', body: 'body', tagList: ['dragons'] };
 
-    test('creates and returns the mapped article', async () => {
+    test('creates and returns the mapped article with the exact Prisma create payload', async () => {
       prismaMock.article.findUnique.mockResolvedValue(null);
       prismaMock.article.create.mockResolvedValue(mockedArticle);
 
       const result = await createArticle(validArticle, 456);
 
-      expect(result).toHaveProperty('slug', mockedArticle.slug);
-      expect(result).toHaveProperty('favoritesCount', 0);
+      expect(prismaMock.article.findUnique).toHaveBeenCalledWith({
+        where: { slug: 'How-to-train-your-dragon-456' },
+        select: { slug: true },
+      });
+      expect(prismaMock.article.create).toHaveBeenCalledWith({
+        data: {
+          title: 'How to train your dragon',
+          description: 'desc',
+          body: 'body',
+          slug: 'How-to-train-your-dragon-456',
+          tagList: {
+            connectOrCreate: [{ create: { name: 'dragons' }, where: { name: 'dragons' } }],
+          },
+          author: { connect: { id: 456 } },
+        },
+        include: ARTICLE_INCLUDE,
+      });
+      expect(result).toEqual({
+        slug: mockedArticle.slug,
+        title: mockedArticle.title,
+        description: mockedArticle.description,
+        body: mockedArticle.body,
+        tagList: ['dragons'],
+        createdAt: mockedArticle.createdAt,
+        updatedAt: mockedArticle.updatedAt,
+        favorited: false,
+        favoritesCount: 0,
+        author: mappedAuthor,
+      });
+    });
+
+    test('defaults tagList to an empty array when it is not an array', async () => {
+      prismaMock.article.findUnique.mockResolvedValue(null);
+      prismaMock.article.create.mockResolvedValue(mockedArticle);
+
+      await createArticle({ ...validArticle, tagList: 'not-an-array' }, 456);
+
+      expect(prismaMock.article.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ tagList: { connectOrCreate: [] } }) }),
+      );
     });
 
     test('throws when title is missing', async () => {
@@ -180,16 +251,32 @@ describe('ArticleService', () => {
       prismaMock.article.findUnique.mockResolvedValue({ slug: mockedArticle.slug } as any);
 
       await expect(createArticle(validArticle, 456)).rejects.toThrow();
+      expect(prismaMock.article.create).not.toHaveBeenCalled();
     });
   });
 
   describe('getArticle', () => {
-    test('returns the mapped article when found', async () => {
+    test('returns the mapped article when found, with the exact Prisma query', async () => {
       prismaMock.article.findUnique.mockResolvedValue(mockedArticle);
 
       const result = await getArticle(mockedArticle.slug, 1);
 
-      expect(result).toHaveProperty('slug', mockedArticle.slug);
+      expect(prismaMock.article.findUnique).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        include: ARTICLE_INCLUDE,
+      });
+      expect(result).toEqual({
+        slug: mockedArticle.slug,
+        title: mockedArticle.title,
+        description: mockedArticle.description,
+        body: mockedArticle.body,
+        tagList: ['dragons'],
+        createdAt: mockedArticle.createdAt,
+        updatedAt: mockedArticle.updatedAt,
+        favorited: false,
+        favoritesCount: 0,
+        author: mappedAuthor,
+      });
     });
 
     test('throws a 404 when the article does not exist', async () => {
@@ -206,21 +293,77 @@ describe('ArticleService', () => {
         .mockResolvedValueOnce(null);
       prismaMock.article.update.mockResolvedValue(mockedArticle);
 
-      const result = await updateArticle({ title: 'New title' }, mockedArticle.slug, 456);
+      const result = await updateArticle(
+        { title: 'A different title', body: 'new body', description: 'new desc', tagList: ['dragons', 'training'] },
+        mockedArticle.slug,
+        456,
+      );
 
-      expect(result).toHaveProperty('slug', mockedArticle.slug);
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        data: {
+          title: 'A different title',
+          body: 'new body',
+          description: 'new desc',
+          slug: 'A-different-title-456',
+          updatedAt: expect.any(Date),
+          tagList: {
+            connectOrCreate: [
+              { create: { name: 'dragons' }, where: { name: 'dragons' } },
+              { create: { name: 'training' }, where: { name: 'training' } },
+            ],
+          },
+        },
+        include: ARTICLE_INCLUDE,
+      });
+      expect(result).toEqual(
+        expect.objectContaining({ slug: mockedArticle.slug, tagList: ['dragons'] }),
+      );
+    });
+
+    test('disconnects existing tags before reconnecting the new ones', async () => {
+      prismaMock.article.findFirst
+        .mockResolvedValueOnce({ author: { id: 456, username: 'RealWorld' } } as any)
+        .mockResolvedValueOnce(null);
+      prismaMock.article.update.mockResolvedValue(mockedArticle);
+
+      await updateArticle({ title: 'New title' }, mockedArticle.slug, 456);
+
+      expect(prismaMock.article.update).toHaveBeenNthCalledWith(1, {
+        where: { slug: mockedArticle.slug },
+        data: { tagList: { set: [] } },
+      });
+    });
+
+    test('does not touch the slug or tagList when neither title nor tagList are provided', async () => {
+      prismaMock.article.findFirst.mockResolvedValueOnce({ author: { id: 456, username: 'RealWorld' } } as any);
+      prismaMock.article.update.mockResolvedValue(mockedArticle);
+
+      await updateArticle({ body: 'only the body changes' }, mockedArticle.slug, 456);
+
+      expect(prismaMock.article.update).toHaveBeenNthCalledWith(2, {
+        where: { slug: mockedArticle.slug },
+        data: {
+          body: 'only the body changes',
+          updatedAt: expect.any(Date),
+          tagList: { connectOrCreate: [] },
+        },
+        include: ARTICLE_INCLUDE,
+      });
     });
 
     test('throws a 404 when the article does not exist', async () => {
       prismaMock.article.findFirst.mockResolvedValue(null);
 
       await expect(updateArticle({}, 'missing-slug', 456)).rejects.toThrow();
+      expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
 
     test('throws a 403 when the current user is not the author', async () => {
       prismaMock.article.findFirst.mockResolvedValue({ author: { id: 999, username: 'someone-else' } } as any);
 
       await expect(updateArticle({}, mockedArticle.slug, 456)).rejects.toThrow();
+      expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
 
     test('throws when the new title slug collides with an existing article', async () => {
@@ -231,6 +374,19 @@ describe('ArticleService', () => {
       await expect(
         updateArticle({ title: 'A different title' }, mockedArticle.slug, 456),
       ).rejects.toThrow();
+      expect(prismaMock.article.update).not.toHaveBeenCalled();
+    });
+
+    test('does not check for a slug collision when the title does not actually change the slug', async () => {
+      // mockedArticle.slug is "how-to-train-your-dragon-1" — using id 1 here (instead of the
+      // usual 456) makes the title-derived slug come out identical to the existing one.
+      prismaMock.article.findFirst.mockResolvedValueOnce({ author: { id: 1, username: 'RealWorld' } } as any);
+      prismaMock.article.update.mockResolvedValue(mockedArticle);
+
+      await updateArticle({ title: 'how to train your dragon' }, mockedArticle.slug, 1);
+
+      // findFirst should only have been called once (the authorization check), not for uniqueness
+      expect(prismaMock.article.findFirst).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -246,209 +402,235 @@ describe('ArticleService', () => {
       prismaMock.article.findFirst.mockResolvedValue(null);
 
       await expect(deleteArticle('missing-slug', 456)).rejects.toThrow();
+      expect(prismaMock.article.delete).not.toHaveBeenCalled();
     });
 
     test('throws a 403 when the current user is not the author', async () => {
       prismaMock.article.findFirst.mockResolvedValue({ author: { id: 999, username: 'someone-else' } } as any);
 
       await expect(deleteArticle(mockedArticle.slug, 456)).rejects.toThrow();
+      expect(prismaMock.article.delete).not.toHaveBeenCalled();
     });
   });
 
   describe('getCommentsByArticle', () => {
-    test('returns the mapped list of comments for an article', async () => {
-      prismaMock.article.findUnique.mockResolvedValue({
-        comments: [
-          {
-            id: 1,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            body: 'nice article',
-            author: { username: 'RealWorld', bio: null, image: null, followedBy: [] },
-          },
-        ],
-      } as any);
+    const commentFixture = {
+      id: 1,
+      createdAt: new Date('2024-01-03T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-04T00:00:00.000Z'),
+      body: 'nice article',
+      author: { username: 'RealWorld', bio: null, image: null, followedBy: [{ id: 1 }] },
+    };
+
+    test('returns the mapped list of comments, with the exact Prisma query, when a user id is given', async () => {
+      prismaMock.article.findUnique.mockResolvedValue({ comments: [commentFixture] } as any);
 
       const result = await getCommentsByArticle(mockedArticle.slug, 1);
 
-      expect(result).toHaveLength(1);
-      expect(result![0]).toHaveProperty('body', 'nice article');
+      expect(prismaMock.article.findUnique).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        include: {
+          comments: {
+            where: { OR: [{ author: { demo: true } }, { author: { id: 1 } }] },
+            select: {
+              id: true,
+              createdAt: true,
+              updatedAt: true,
+              body: true,
+              author: { select: { username: true, bio: true, image: true, followedBy: true } },
+            },
+          },
+        },
+      });
+      expect(result).toEqual([
+        {
+          id: 1,
+          createdAt: commentFixture.createdAt,
+          updatedAt: commentFixture.updatedAt,
+          body: 'nice article',
+          author: { username: 'RealWorld', bio: null, image: null, following: true },
+        },
+      ]);
+    });
+
+    test('only filters by demo authors when no user id is given', async () => {
+      prismaMock.article.findUnique.mockResolvedValue({ comments: [] } as any);
+
+      await getCommentsByArticle(mockedArticle.slug);
+
+      expect(prismaMock.article.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            comments: expect.objectContaining({ where: { OR: [{ author: { demo: true } }] } }),
+          }),
+        }),
+      );
     });
   });
 
   describe('addComment', () => {
-    test('creates and returns the mapped comment', async () => {
+    test('creates and returns the mapped comment, connecting the right article and author', async () => {
       prismaMock.article.findUnique.mockResolvedValue({ id: mockedArticle.id } as any);
       prismaMock.comment.create.mockResolvedValue({
         id: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date('2024-01-03T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-04T00:00:00.000Z'),
         body: 'nice article',
         author: { username: 'RealWorld', bio: null, image: null, followedBy: [] },
       } as any);
 
       const result = await addComment('nice article', mockedArticle.slug, 456);
 
-      expect(result).toHaveProperty('body', 'nice article');
+      expect(prismaMock.comment.create).toHaveBeenCalledWith({
+        data: {
+          body: 'nice article',
+          article: { connect: { id: mockedArticle.id } },
+          author: { connect: { id: 456 } },
+        },
+        include: {
+          author: { select: { username: true, bio: true, image: true, followedBy: true } },
+        },
+      });
+      expect(result).toEqual({
+        id: 1,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+        body: 'nice article',
+        author: { username: 'RealWorld', bio: null, image: null, following: false },
+      });
     });
 
     test('throws when the comment body is blank', async () => {
       await expect(addComment('', mockedArticle.slug, 456)).rejects.toThrow();
-    });
-  });
-
-  describe('bookmarkArticle', () => {
-    test('returns the bookmarked article', async () => {
-      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
-
-      const result = await bookmarkArticle(mockedArticle.slug, 1);
-
-      expect(result).toHaveProperty('bookmarksCount', 0);
-      expect(result).toHaveProperty('bookmarked', false);
-    });
-  });
-
-  describe('unbookmarkArticle', () => {
-    test('returns the unbookmarked article', async () => {
-      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
-
-      const result = await unbookmarkArticle(mockedArticle.slug, 1);
-
-      expect(result).toHaveProperty('bookmarksCount', 0);
-      expect(result).toHaveProperty('bookmarked', false);
+      expect(prismaMock.comment.create).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteComment', () => {
-    test('should throw an error ', () => {
-      // Given
-      const id = 123;
-      const idUser = 456;
+    test('deletes the comment when the current user is the author', async () => {
+      prismaMock.comment.findFirst.mockResolvedValue({ author: { id: 456, username: 'RealWorld' } } as any);
 
-      // When
+      await expect(deleteComment(1, 456)).resolves.toBeUndefined();
+      expect(prismaMock.comment.findFirst).toHaveBeenCalledWith({
+        where: { id: 1, author: { id: 456 } },
+        select: { author: { select: { id: true, username: true } } },
+      });
+      expect(prismaMock.comment.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    test('throws a 404 when the comment does not exist', async () => {
       prismaMock.comment.findFirst.mockResolvedValue(null);
 
-      // Then
-      expect(deleteComment(id, idUser)).rejects.toThrow();
+      await expect(deleteComment(123, 456)).rejects.toThrow();
+      expect(prismaMock.comment.delete).not.toHaveBeenCalled();
     });
   });
 
   describe('favoriteArticle', () => {
-    test('should return the favorited article', async () => {
-      // Given
-      const slug = 'How-to-train-your-dragon';
-      const username = 'RealWorld';
+    test('connects the current user and returns the mapped, favorited article', async () => {
+      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
 
-      const mockedUserResponse = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-      };
+      const result = await favoriteArticle(mockedArticle.slug, 1);
 
-      const mockedArticleResponse = {
-        id: 123,
-        slug: 'How-to-train-your-dragon',
-        title: 'How to train your dragon',
-        description: '',
-        body: '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        authorId: 456,
-        tagList: [],
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        data: { favoritedBy: { connect: { id: 1 } } },
+        include: ARTICLE_INCLUDE,
+      });
+      expect(result).toEqual({
+        id: mockedArticle.id,
+        slug: mockedArticle.slug,
+        title: mockedArticle.title,
+        description: mockedArticle.description,
+        body: mockedArticle.body,
+        createdAt: mockedArticle.createdAt,
+        updatedAt: mockedArticle.updatedAt,
+        authorId: mockedArticle.authorId,
         favoritedBy: [],
-        author: {
-          username: 'RealWorld',
-          bio: null,
-          image: null,
-          followedBy: [],
-        },
-      };
-
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedUserResponse);
-      prismaMock.article.update.mockResolvedValue(mockedArticleResponse);
-
-      // Then
-      await expect(favoriteArticle(slug, mockedUserResponse.id)).resolves.toHaveProperty(
-        'favoritesCount',
-      );
+        bookmarkedBy: [],
+        author: mappedAuthor,
+        tagList: ['dragons'],
+        favorited: false,
+        favoritesCount: 0,
+      });
     });
 
-    test('should throw an error if no user is found', async () => {
-      // Given
-      const id = 123;
-      const slug = 'how-to-train-your-dragon';
-      const username = 'RealWorld';
+    test('favorited is true when the current user is already in favoritedBy', async () => {
+      prismaMock.article.update.mockResolvedValue({ ...mockedArticle, favoritedBy: [{ id: 1 }] } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(null);
+      const result = await favoriteArticle(mockedArticle.slug, 1);
 
-      // Then
-      await expect(favoriteArticle(slug, id)).rejects.toThrow();
+      expect(result).toHaveProperty('favorited', true);
     });
   });
+
   describe('unfavoriteArticle', () => {
-    test('should return the unfavorited article', async () => {
-      // Given
-      const slug = 'How-to-train-your-dragon';
-      const username = 'RealWorld';
+    test('disconnects the current user and returns the mapped, unfavorited article', async () => {
+      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
 
-      const mockedUserResponse = {
-        id: 123,
-        username: 'RealWorld',
-        email: 'realworld@me',
-        password: '1234',
-        bio: null,
-        image: null,
-        token: '',
-        demo: false,
-      };
+      const result = await unfavoriteArticle(mockedArticle.slug, 1);
 
-      const mockedArticleResponse = {
-        id: 123,
-        slug: 'How-to-train-your-dragon',
-        title: 'How to train your dragon',
-        description: '',
-        body: '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        authorId: 456,
-        tagList: [],
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        data: { favoritedBy: { disconnect: { id: 1 } } },
+        include: ARTICLE_INCLUDE,
+      });
+      expect(result).toHaveProperty('favorited', false);
+      expect(result).toHaveProperty('favoritesCount', 0);
+    });
+  });
+
+  describe('bookmarkArticle', () => {
+    test('connects the current user and returns the mapped, bookmarked article', async () => {
+      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
+
+      const result = await bookmarkArticle(mockedArticle.slug, 1);
+
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        data: { bookmarkedBy: { connect: { id: 1 } } },
+        include: BOOKMARK_INCLUDE,
+      });
+      expect(result).toEqual({
+        id: mockedArticle.id,
+        slug: mockedArticle.slug,
+        title: mockedArticle.title,
+        description: mockedArticle.description,
+        body: mockedArticle.body,
+        createdAt: mockedArticle.createdAt,
+        updatedAt: mockedArticle.updatedAt,
+        authorId: mockedArticle.authorId,
         favoritedBy: [],
-        author: {
-          username: 'RealWorld',
-          bio: null,
-          image: null,
-          followedBy: [],
-        },
-      };
-
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(mockedUserResponse);
-      prismaMock.article.update.mockResolvedValue(mockedArticleResponse);
-
-      // Then
-      await expect(unfavoriteArticle(slug, mockedUserResponse.id)).resolves.toHaveProperty(
-        'favoritesCount',
-      );
+        bookmarkedBy: [],
+        author: mappedAuthor,
+        tagList: ['dragons'],
+        bookmarked: false,
+        bookmarksCount: 0,
+      });
     });
 
-    test('should throw an error if no user is found', async () => {
-      // Given
-      const id = 123;
-      const slug = 'how-to-train-your-dragon';
-      const username = 'RealWorld';
+    test('bookmarked is true when the current user is already in bookmarkedBy', async () => {
+      prismaMock.article.update.mockResolvedValue({ ...mockedArticle, bookmarkedBy: [{ id: 1 }] } as any);
 
-      // When
-      prismaMock.user.findUnique.mockResolvedValue(null);
+      const result = await bookmarkArticle(mockedArticle.slug, 1);
 
-      // Then
-      await expect(unfavoriteArticle(slug, id)).rejects.toThrow();
+      expect(result).toHaveProperty('bookmarked', true);
+    });
+  });
+
+  describe('unbookmarkArticle', () => {
+    test('disconnects the current user and returns the mapped, unbookmarked article', async () => {
+      prismaMock.article.update.mockResolvedValue(mockedArticle as any);
+
+      const result = await unbookmarkArticle(mockedArticle.slug, 1);
+
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
+        where: { slug: mockedArticle.slug },
+        data: { bookmarkedBy: { disconnect: { id: 1 } } },
+        include: BOOKMARK_INCLUDE,
+      });
+      expect(result).toHaveProperty('bookmarked', false);
+      expect(result).toHaveProperty('bookmarksCount', 0);
     });
   });
 });
