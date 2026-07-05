@@ -46,3 +46,6 @@ Thumbs.db
 .nx/polygraph
 .nx/self-healing
 .nx/migrate-runs
+
+.stryker-temp
+migrations.json
