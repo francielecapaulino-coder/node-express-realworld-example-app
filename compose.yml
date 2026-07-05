@@ -5,6 +5,7 @@
 #
 # Usage:
 #   docker compose up --build
+#   POSTGRES_HOST_PORT=5433 docker compose up --build   # if 5432 is already taken locally
 #
 # Grafana:    http://localhost:3001  (admin / admin)
 # API:        http://localhost:3000/api
@@ -22,7 +23,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-conduit}
       POSTGRES_DB: ${POSTGRES_DB:-conduit}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

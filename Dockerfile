@@ -8,9 +8,21 @@ FROM docker.io/node:lts-alpine AS builder
 
 WORKDIR /build
 
+# Prisma's query engine needs libssl to detect the right binary target;
+# without it (Alpine ships without OpenSSL by default) it falls back to a
+# guess that may not actually match what's installed.
+RUN apk add --no-cache openssl
+
 # Install dependencies first (layer-cached unless package files change)
 COPY package*.json ./
+COPY src/prisma/schema.prisma ./src/prisma/schema.prisma
 RUN npm ci --ignore-scripts
+
+# --ignore-scripts skips @prisma/client's own postinstall hook, so the
+# generated client (and its query engine binary) never gets created —
+# without this, the TypeScript build fails because "@prisma/client"
+# has no exported member 'PrismaClient' yet. Generate it explicitly.
+RUN npx prisma generate
 
 # Copy source and compile
 COPY tsconfig*.json nx.json project.json ./
@@ -27,7 +39,8 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-RUN addgroup --system api && \
+RUN apk add --no-cache openssl && \
+    addgroup --system api && \
     adduser --system -G api api
 
 # Copy built output and production package manifest
@@ -36,8 +49,15 @@ COPY --from=builder /build/package*.json ./
 COPY --from=builder /build/src/prisma/schema.prisma ./api/prisma/schema.prisma
 
 # Install production dependencies only
-RUN npm ci --omit=dev --ignore-scripts && \
-    chown -R api:api .
+RUN npm ci --omit=dev --ignore-scripts
+
+# Reuse the already-generated Prisma client + query engine from the builder
+# stage instead of regenerating it here (same base image/arch, so the
+# compiled engine binary is compatible).
+COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /build/node_modules/@prisma/client ./node_modules/@prisma/client
+
+RUN chown -R api:api .
 
 USER api
 
