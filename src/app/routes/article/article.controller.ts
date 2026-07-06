@@ -62,7 +62,7 @@ const router = Router();
  *               $ref: '#/components/schemas/ArticlesResponse'
  */
 router.get('/articles', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-const result = await getArticles(req.query, req.auth?.user?.id);
+const result = await getArticles(req.query, req.auth?.user.id);
   res.json(result);
 }));
 
@@ -101,7 +101,7 @@ router.get('/articles/feed', auth.required, asyncHandler(async (req: Request, re
   const result = await getFeed(
     Number(req.query.offset),
     Number(req.query.limit),
-    req.auth?.user?.id,
+    req.auth!.user.id,
   );
   res.json(result);
 }));
@@ -139,7 +139,7 @@ router.get('/articles/feed', auth.required, asyncHandler(async (req: Request, re
  *         description: Validation error
  */
 router.post('/articles', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const article = await createArticle(req.body.article, req.auth?.user?.id);
+  const article = await createArticle(req.body.article, req.auth!.user.id);
   res.status(201).json({ article });
 }));
 
@@ -167,7 +167,7 @@ router.post('/articles', auth.required, asyncHandler(async (req: Request, res: R
  *         description: Article not found
  */
 router.get('/articles/:slug', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-  const article = await getArticle(String(req.params.slug), req.auth?.user?.id);
+  const article = await getArticle(String(req.params.slug), req.auth?.user.id);
   res.json({ article });
 }));
 
@@ -210,7 +210,7 @@ router.get('/articles/:slug', auth.optional, asyncHandler(async (req: Request, r
  *         description: Article not found
  */
 router.put('/articles/:slug', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const article = await updateArticle(req.body.article, String(req.params.slug), req.auth?.user?.id);
+  const article = await updateArticle(req.body.article, String(req.params.slug), req.auth!.user.id);
   res.json({ article });
 }));
 
@@ -242,7 +242,7 @@ router.put('/articles/:slug', auth.required, asyncHandler(async (req: Request, r
  *         description: Article not found
  */
 router.delete('/articles/:slug', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const article = await deleteArticle(String(req.params.slug), req.auth?.user?.id);
+  const article = await deleteArticle(String(req.params.slug), req.auth!.user.id);
   res.json({ article });
 }));
 
@@ -277,7 +277,7 @@ router.post(
   '/articles/:slug/favorite',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const article = await favoriteArticle(String(req.params.slug), req.auth?.user?.id);
+    const article = await favoriteArticle(String(req.params.slug), req.auth!.user.id);
     res.json({ article });
   }),
 );
@@ -313,7 +313,7 @@ router.delete(
   '/articles/:slug/favorite',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const article = await unfavoriteArticle(String(req.params.slug), req.auth?.user?.id);
+    const article = await unfavoriteArticle(String(req.params.slug), req.auth!.user.id);
     res.json({ article });
   }),
 );
@@ -365,7 +365,7 @@ router.post(
   '/articles/:slug/comments',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const comment = await addComment(req.body.comment.body, String(req.params.slug), req.auth?.user?.id);
+    const comment = await addComment(req.body.comment.body, String(req.params.slug), req.auth!.user.id);
     res.json({ comment });
   }),
 );
@@ -408,7 +408,7 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
 const comment = await deleteComment(
       Number(req.params.id),
-      req.auth?.user?.id,
+      req.auth!.user.id,
     );
     res.json({ comment });
   }),
@@ -441,7 +441,7 @@ router.get(
   '/articles/:slug/comments',
   auth.optional,
   asyncHandler(async (req: Request, res: Response) => {
-const comments = await getCommentsByArticle(String(req.params.slug), req.auth?.user?.id);
+const comments = await getCommentsByArticle(String(req.params.slug), req.auth?.user.id);
     res.json({ comments });
   }),
 );
@@ -478,7 +478,7 @@ router.post(
   '/articles/:slug/bookmark',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const article = await bookmarkArticle(String(req.params.slug), req.auth?.user?.id);
+    const article = await bookmarkArticle(String(req.params.slug), req.auth!.user.id);
     res.status(201).json({ article });
   }),
 );
@@ -514,7 +514,7 @@ router.delete(
   '/articles/:slug/bookmark',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const article = await unbookmarkArticle(String(req.params.slug), req.auth?.user?.id);
+    const article = await unbookmarkArticle(String(req.params.slug), req.auth!.user.id);
     res.json({ article });
   }),
 );

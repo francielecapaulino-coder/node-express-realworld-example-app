@@ -12,12 +12,12 @@ describe('getTokenFromHeaders', () => {
     expect(getTokenFromHeaders(buildReq('Bearer abc.def.ghi'))).toBe('abc.def.ghi');
   });
 
-  test('returns null when the scheme is neither Token nor Bearer', () => {
-    expect(getTokenFromHeaders(buildReq('Basic abc.def.ghi'))).toBeNull();
+  test('returns undefined when the scheme is neither Token nor Bearer', () => {
+    expect(getTokenFromHeaders(buildReq('Basic abc.def.ghi'))).toBeUndefined();
   });
 
-  test('returns null when there is no authorization header', () => {
-    expect(getTokenFromHeaders(buildReq(undefined))).toBeNull();
+  test('returns undefined when there is no authorization header', () => {
+    expect(getTokenFromHeaders(buildReq(undefined))).toBeUndefined();
   });
 });
 

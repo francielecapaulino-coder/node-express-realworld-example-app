@@ -33,7 +33,7 @@ router.get(
   '/profiles/:username',
   auth.optional,
   asyncHandler(async (req: Request, res: Response) => {
-    const profile = await getProfile(String(req.params.username), req.auth?.user?.id);
+    const profile = await getProfile(String(req.params.username), req.auth?.user.id);
     res.json({ profile });
   }),
 );
@@ -69,7 +69,7 @@ router.post(
   '/profiles/:username/follow',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const profile = await followUser(String(req.params.username), req.auth?.user?.id);
+    const profile = await followUser(String(req.params.username), req.auth!.user.id);
     res.json({ profile });
   }),
 );
@@ -105,7 +105,7 @@ router.delete(
   '/profiles/:username/follow',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const profile = await unfollowUser(String(req.params.username), req.auth?.user?.id);
+    const profile = await unfollowUser(String(req.params.username), req.auth!.user.id);
     res.json({ profile });
   }),
 );

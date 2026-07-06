@@ -53,13 +53,14 @@ const buildReq = (overrides: Partial<Request> = {}): Request =>
   } as unknown as Request);
 
 const buildRes = (): Response => {
-  const res = {
+  const res: any = {
     statusCode: 200,
     end: jest.fn(),
     json: jest.fn(),
     set: jest.fn(),
     send: jest.fn(),
   };
+  res.status = jest.fn().mockReturnValue(res);
   return res as unknown as Response;
 };
 
@@ -90,6 +91,7 @@ describe('httpMetricsMiddleware', () => {
     httpMetricsMiddleware(req, res, jest.fn());
 
     expect(getMetricsData().totalRequests).toBe(1);
+    expect(req.get).toHaveBeenCalledWith('User-Agent');
     expect(logger.info).toHaveBeenCalledWith(
       {
         method: 'GET',
@@ -99,6 +101,25 @@ describe('httpMetricsMiddleware', () => {
         requestId: undefined,
       },
       '[HTTP_METRICS] Request started',
+    );
+  });
+
+  test('picks up the x-request-id header and threads it through the start and completion logs', () => {
+    const req = buildReq({ headers: { 'x-request-id': 'req-abc-123' } });
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-abc-123' }),
+      '[HTTP_METRICS] Request started',
+    );
+
+    end(res);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-abc-123' }),
+      '[HTTP_METRICS] Request completed',
     );
   });
 
@@ -166,6 +187,35 @@ describe('httpMetricsMiddleware', () => {
       method: 'GET',
       route: '/api/articles',
       status_code: '200',
+    });
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ duration: '0.500s' }),
+      '[HTTP_METRICS] Request completed',
+    );
+  });
+
+  test('falls back to req.path for the route label in error/duration/final-counter metrics when req.route is not set', () => {
+    const req = buildReq({ route: undefined, path: '/unmatched' });
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    res.statusCode = 500;
+    end(res);
+
+    expect(mockInstruments['http_requests_errors_total'].add).toHaveBeenCalledWith(1, {
+      method: 'GET',
+      route: '/unmatched',
+      status_code: 500,
+    });
+    expect(mockInstruments['http_request_duration_seconds'].record).toHaveBeenCalledWith(expect.any(Number), {
+      method: 'GET',
+      route: '/unmatched',
+      status_code: '500',
+    });
+    expect(mockInstruments['http_requests_total'].add).toHaveBeenLastCalledWith(1, {
+      method: 'GET',
+      route: '/unmatched',
+      status_code: '500',
     });
   });
 
@@ -248,7 +298,7 @@ describe('httpMetricsMiddleware', () => {
     httpMetricsMiddleware(req, res, jest.fn());
     end(res, 'body', 'utf-8');
 
-    expect(originalEnd).toHaveBeenCalledWith('body', 'utf-8');
+    expect(originalEnd).toHaveBeenCalledWith('body', 'utf-8', undefined);
   });
 });
 
@@ -333,7 +383,13 @@ describe('metricsHandler', () => {
 
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        metrics: expect.objectContaining({ totalRequests: 2, errorCount: 1, errorRate: '50.00%' }),
+        metrics: expect.objectContaining({
+          totalRequests: 2,
+          errorCount: 1,
+          errorRate: '50.00%',
+          endpointCounts: { 'GET /api/articles': 2 },
+          averageResponseTime: expect.stringMatching(/^\d+\.\d{3}s$/),
+        }),
       }),
     );
   });
@@ -342,6 +398,23 @@ describe('metricsHandler', () => {
     await metricsHandler({} as Request, buildRes());
 
     expect(logger.info).toHaveBeenCalledWith('[METRICS] Health metrics served');
+  });
+
+  test('responds with 500 and logs when building the response payload throws', async () => {
+    const res = buildRes();
+    const boom = new Error('boom');
+    (res.json as jest.Mock).mockImplementationOnce(() => {
+      throw boom;
+    });
+
+    await metricsHandler({} as Request, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenLastCalledWith({
+      error: 'Failed to retrieve metrics',
+      timestamp: expect.any(String),
+    });
+    expect(logger.error).toHaveBeenCalledWith({ error: boom }, '[METRICS] Failed to serve metrics');
   });
 });
 
@@ -382,5 +455,19 @@ describe('prometheusMetricsHandler', () => {
     await prometheusMetricsHandler({} as Request, buildRes());
 
     expect(logger.info).toHaveBeenCalledWith('[METRICS] Prometheus metrics served');
+  });
+
+  test('responds with 500 and logs when sending the Prometheus payload throws', async () => {
+    const res = buildRes();
+    const boom = new Error('boom');
+    (res.send as jest.Mock).mockImplementationOnce(() => {
+      throw boom;
+    });
+
+    await prometheusMetricsHandler({} as Request, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.send).toHaveBeenLastCalledWith('# Error generating metrics\n');
+    expect(logger.error).toHaveBeenCalledWith({ error: boom }, '[METRICS] Failed to serve Prometheus metrics');
   });
 });

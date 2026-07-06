@@ -133,7 +133,7 @@ router.post('/users/login', loginRateLimit, asyncHandler(async (req: Request, re
  *         description: Missing or invalid authorization credentials
  */
 router.get('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const user = await getCurrentUser(req.auth?.user?.id);
+  const user = await getCurrentUser(req.auth!.user.id);
   res.json({ user });
 }));
 
@@ -170,7 +170,7 @@ router.get('/user', auth.required, asyncHandler(async (req: Request, res: Respon
  *         description: Validation error
  */
 router.put('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const user = await updateUser(req.body.user, req.auth?.user?.id);
+  const user = await updateUser(req.body.user, req.auth!.user.id);
 res.json({ user });
 }));
 

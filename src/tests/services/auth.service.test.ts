@@ -85,54 +85,61 @@ describe('AuthService', () => {
     });
 
     test('throws when creating a new user with an empty username', async () => {
-      const error = String({ errors: { username: ["can't be blank"] } });
       await expect(
         createUser({ id: 123, username: ' ', email: 'realworld@me', password: '1234' } as any),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { username: ["can't be blank"] } } });
     });
 
     test('throws when creating a new user with an empty email', async () => {
-      const error = String({ errors: { email: ["can't be blank"] } });
       await expect(
         createUser({ id: 123, username: 'RealWorld', email: '  ', password: '1234' } as any),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { email: ["can't be blank"] } } });
     });
 
     test('throws when creating a new user with an empty password', async () => {
-      const error = String({ errors: { password: ["can't be blank"] } });
       await expect(
         createUser({ id: 123, username: 'RealWorld', email: 'realworld@me', password: ' ' } as any),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { password: ["can't be blank"] } } });
+    });
+
+    test('throws when creating a new user with a missing email field', async () => {
+      await expect(
+        createUser({ id: 123, username: 'RealWorld', password: '1234' } as any),
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { email: ["can't be blank"] } } });
+    });
+
+    test('throws when creating a new user with a missing password field', async () => {
+      await expect(
+        createUser({ id: 123, username: 'RealWorld', email: 'realworld@me' } as any),
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { password: ["can't be blank"] } } });
     });
 
     test('throws a 422 with both fields when both email and username already exist', async () => {
       prismaMock.user.findUnique.mockResolvedValue({ id: 999 } as any);
 
-      const error = String({
-        errors: { email: ['has already been taken'], username: ['has already been taken'] },
-      });
       await expect(
         createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({
+        errorCode: 422,
+        message: { errors: { email: ['has already been taken'], username: ['has already been taken'] } },
+      });
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
     test('throws a 422 with only email when just the email already exists', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce({ id: 999 } as any).mockResolvedValueOnce(null);
 
-      const error = String({ errors: { email: ['has already been taken'] } });
       await expect(
         createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { email: ['has already been taken'] } } });
     });
 
     test('throws a 422 with only username when just the username already exists', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 999 } as any);
 
-      const error = String({ errors: { username: ['has already been taken'] } });
       await expect(
         createUser({ username: 'RealWorld', email: 'realworld@me', password: '1234' }),
-      ).rejects.toThrow(error);
+      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { username: ['has already been taken'] } } });
     });
   });
 
@@ -180,20 +187,42 @@ describe('AuthService', () => {
     });
 
     test('throws when the email is empty', async () => {
-      const error = String({ errors: { email: ["can't be blank"] } });
-      await expect(login({ email: ' ', password: '1234' })).rejects.toThrow(error);
+      await expect(login({ email: ' ', password: '1234' })).rejects.toMatchObject({
+        errorCode: 422,
+        message: { errors: { email: ["can't be blank"] } },
+      });
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    test('throws when the email field is missing', async () => {
+      await expect(login({ password: '1234' })).rejects.toMatchObject({
+        errorCode: 422,
+        message: { errors: { email: ["can't be blank"] } },
+      });
     });
 
     test('throws when the password is empty', async () => {
-      const error = String({ errors: { password: ["can't be blank"] } });
-      await expect(login({ email: 'realworld@me', password: ' ' })).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: ' ' })).rejects.toMatchObject({
+        errorCode: 422,
+        message: { errors: { password: ["can't be blank"] } },
+      });
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    test('throws when the password field is missing', async () => {
+      await expect(login({ email: 'realworld@me' })).rejects.toMatchObject({
+        errorCode: 422,
+        message: { errors: { password: ["can't be blank"] } },
+      });
     });
 
     test('throws a 403 when no user is found for the email', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
-      const error = String({ errors: { 'email or password': ['is invalid'] } });
-      await expect(login({ email: 'realworld@me', password: '1234' })).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: '1234' })).rejects.toMatchObject({
+        errorCode: 403,
+        message: { errors: { 'email or password': ['is invalid'] } },
+      });
     });
 
     test('throws a 403 when the password does not match', async () => {
@@ -205,8 +234,10 @@ describe('AuthService', () => {
         password: hashedPassword,
       });
 
-      const error = String({ errors: { 'email or password': ['is invalid'] } });
-      await expect(login({ email: 'realworld@me', password: 'wrong-password' })).rejects.toThrow(error);
+      await expect(login({ email: 'realworld@me', password: 'wrong-password' })).rejects.toMatchObject({
+        errorCode: 403,
+        message: { errors: { 'email or password': ['is invalid'] } },
+      });
     });
   });
 

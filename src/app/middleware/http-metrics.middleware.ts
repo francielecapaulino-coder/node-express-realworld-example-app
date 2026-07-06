@@ -95,7 +95,9 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
   
 // Override res.end to track completion
   const originalEnd = res.end;
-  (res.end as any) = function(chunk?: any, encoding?: any, cb?: any) {
+  // res.end has multiple overloaded signatures upstream (chunk/encoding/callback in varying
+  // combinations); reassigning it to a single wider signature needs an `any` cast here.
+  (res.end as any) = function (this: Response, chunk?: unknown, encoding?: BufferEncoding, cb?: () => void) {
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000; // Convert to seconds
     
@@ -142,8 +144,8 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
       totalRequests: metricsData.totalRequests,
     }, '[HTTP_METRICS] Request completed');
     
-    // Call original end
-    originalEnd.call(this, chunk, encoding);
+    // Call original end (cast: originalEnd's overloads don't cover this generic re-call shape)
+    (originalEnd as (...args: unknown[]) => Response).call(this, chunk, encoding, cb);
   };
   
   next();

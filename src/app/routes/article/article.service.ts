@@ -1,14 +1,25 @@
 import slugify from 'slugify';
+import { Request } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../../../prisma/prisma-client';
 import HttpException from '../../models/http-exception.model';
 import profileMapper from '../profile/profile.utils';
 import articleMapper from './article.mapper';
 import { Tag } from '../tag/tag.model';
 
-const buildFindAllQuery = (query: any, id: number | undefined) => {
-  const queries: any = [];
-  const orAuthorQuery = [];
-  const andAuthorQuery = [];
+export interface ArticleInput {
+  title?: string;
+  description?: string;
+  body?: string;
+  tagList?: unknown;
+}
+
+type ArticleListQuery = Request['query'];
+
+const buildFindAllQuery = (query: ArticleListQuery, id: number | undefined): Prisma.ArticleWhereInput[] => {
+  const queries: Prisma.ArticleWhereInput[] = [];
+  const orAuthorQuery: Prisma.UserWhereInput[] = [];
+  const andAuthorQuery: Prisma.UserWhereInput[] = [];
 
   orAuthorQuery.push({
     demo: {
@@ -27,7 +38,7 @@ const buildFindAllQuery = (query: any, id: number | undefined) => {
   if ('author' in query) {
     andAuthorQuery.push({
       username: {
-        equals: query.author,
+        equals: String(query.author),
       },
     });
   }
@@ -45,7 +56,7 @@ const buildFindAllQuery = (query: any, id: number | undefined) => {
     queries.push({
       tagList: {
         some: {
-          name: query.tag,
+          name: String(query.tag),
         },
       },
     });
@@ -56,7 +67,7 @@ const buildFindAllQuery = (query: any, id: number | undefined) => {
       favoritedBy: {
         some: {
           username: {
-            equals: query.favorited,
+            equals: String(query.favorited),
           },
         },
       },
@@ -66,7 +77,7 @@ const buildFindAllQuery = (query: any, id: number | undefined) => {
   return queries;
 };
 
-export const getArticles = async (query: any, id?: number) => {
+export const getArticles = async (query: ArticleListQuery, id?: number) => {
   const andQueries = buildFindAllQuery(query, id);
   const articlesCount = await prisma.article.count({
     where: {
@@ -105,7 +116,7 @@ export const getArticles = async (query: any, id?: number) => {
   });
 
   return {
-    articles: articles.map((article: any) => articleMapper(article, id)),
+    articles: articles.map((article) => articleMapper(article, id)),
     articlesCount,
   };
 };
@@ -154,12 +165,12 @@ export const getFeed = async (offset: number, limit: number, id: number) => {
   });
 
   return {
-    articles: articles.map((article: any) => articleMapper(article, id)),
+    articles: articles.map((article) => articleMapper(article, id)),
     articlesCount,
   };
 };
 
-export const createArticle = async (article: any, id: number) => {
+export const createArticle = async (article: ArticleInput, id: number) => {
   const { title, description, body, tagList } = article;
   const tags = Array.isArray(tagList) ? tagList : [];
 
@@ -286,7 +297,7 @@ const disconnectArticlesTags = async (slug: string) => {
   });
 };
 
-export const updateArticle = async (article: any, slug: string, id: number) => {
+export const updateArticle = async (article: ArticleInput, slug: string, id: number) => {
   let newSlug = null;
 
   const existingArticle = await await prisma.article.findFirst({
@@ -333,7 +344,7 @@ export const updateArticle = async (article: any, slug: string, id: number) => {
   }
 
   const tagList =
-    Array.isArray(article.tagList) && article.tagList?.length
+    Array.isArray(article.tagList) && article.tagList.length
       ? article.tagList.map((tag: string) => ({
           create: { name: tag },
           where: { name: tag },
@@ -457,13 +468,13 @@ export const getCommentsByArticle = async (slug: string, id?: number) => {
     },
   });
 
-  const result = comments?.comments.map((comment: any) => ({
+  const result = comments?.comments.map((comment) => ({
     ...comment,
     author: {
       username: comment.author.username,
       bio: comment.author.bio,
       image: comment.author.image,
-      following: comment.author.followedBy.some((follow: any) => follow.id === id),
+      following: comment.author.followedBy.some((follow) => follow.id === id),
     },
   }));
 
@@ -519,7 +530,7 @@ export const addComment = async (body: string, slug: string, id: number) => {
       username: comment.author.username,
       bio: comment.author.bio,
       image: comment.author.image,
-      following: comment.author.followedBy.some((follow: any) => follow.id === id),
+      following: comment.author.followedBy.some((follow) => follow.id === id),
     },
   };
 };
@@ -597,9 +608,9 @@ export const favoriteArticle = async (slugPayload: string, id: number) => {
   const result = {
     ...article,
     author: profileMapper(article.author, id),
-    tagList: article?.tagList.map((tag: Tag) => tag.name),
-    favorited: article.favoritedBy.some((favorited: any) => favorited.id === id),
-    favoritesCount: _count?.favoritedBy,
+    tagList: article.tagList.map((tag: Tag) => tag.name),
+    favorited: article.favoritedBy.some((favorited) => favorited.id === id),
+    favoritesCount: _count.favoritedBy,
   };
 
   return result;
@@ -643,9 +654,9 @@ export const unfavoriteArticle = async (slugPayload: string, id: number) => {
   const result = {
     ...article,
     author: profileMapper(article.author, id),
-    tagList: article?.tagList.map((tag: Tag) => tag.name),
-    favorited: article.favoritedBy.some((favorited: any) => favorited.id === id),
-    favoritesCount: _count?.favoritedBy,
+    tagList: article.tagList.map((tag: Tag) => tag.name),
+    favorited: article.favoritedBy.some((favorited) => favorited.id === id),
+    favoritesCount: _count.favoritedBy,
   };
 
   return result;
@@ -689,9 +700,9 @@ export const bookmarkArticle = async (slugPayload: string, id: number) => {
   const result = {
     ...article,
     author: profileMapper(article.author, id),
-    tagList: article?.tagList.map((tag: Tag) => tag.name),
-    bookmarked: article.bookmarkedBy.some((bookmarked: any) => bookmarked.id === id),
-    bookmarksCount: _count?.bookmarkedBy,
+    tagList: article.tagList.map((tag: Tag) => tag.name),
+    bookmarked: article.bookmarkedBy.some((bookmarked) => bookmarked.id === id),
+    bookmarksCount: _count.bookmarkedBy,
   };
 
   return result;
@@ -735,9 +746,9 @@ export const unbookmarkArticle = async (slugPayload: string, id: number) => {
   const result = {
     ...article,
     author: profileMapper(article.author, id),
-    tagList: article?.tagList.map((tag: Tag) => tag.name),
-    bookmarked: article.bookmarkedBy.some((bookmarked: any) => bookmarked.id === id),
-    bookmarksCount: _count?.bookmarkedBy,
+    tagList: article.tagList.map((tag: Tag) => tag.name),
+    bookmarked: article.bookmarkedBy.some((bookmarked) => bookmarked.id === id),
+    bookmarksCount: _count.bookmarkedBy,
   };
 
   return result;

@@ -22,7 +22,7 @@ const router = Router();
  *               $ref: '#/components/schemas/TagsResponse'
  */
 router.get('/tags', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-  const tags = await getTags(req.auth?.user?.id);
+  const tags = await getTags(req.auth?.user.id);
   res.json({ tags });
 }));
 

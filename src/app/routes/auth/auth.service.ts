@@ -81,7 +81,12 @@ export const createUser = async (input: RegisterInput): Promise<RegisteredUser> 
   };
 };
 
-export const login = async (userPayload: any) => {
+export interface LoginInput {
+  email?: string;
+  password?: string;
+}
+
+export const login = async (userPayload: LoginInput) => {
   const email = userPayload.email?.trim();
   const password = userPayload.password?.trim();
 
@@ -148,7 +153,15 @@ export const getCurrentUser = async (id: number) => {
   };
 };
 
-export const updateUser = async (userPayload: any, id: number) => {
+export interface UpdateUserInput {
+  email?: string;
+  username?: string;
+  password?: string;
+  image?: string;
+  bio?: string;
+}
+
+export const updateUser = async (userPayload: UpdateUserInput, id: number) => {
   const { email, username, password, image, bio } = userPayload;
   let hashedPassword;
 

@@ -135,11 +135,12 @@ describe('article.controller', () => {
     });
 
     test('deletes the article and returns the { article } envelope', async () => {
-      (articleService.deleteArticle as jest.Mock).mockResolvedValue(undefined);
+      (articleService.deleteArticle as jest.Mock).mockResolvedValue({ slug: 'my-article' });
 
       const res = await request(app).delete('/articles/my-article').set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
+      expect(res.body).toEqual({ article: { slug: 'my-article' } });
       expect(articleService.deleteArticle).toHaveBeenCalledWith('my-article', 456);
     });
   });
@@ -168,6 +169,7 @@ describe('article.controller', () => {
       const res = await request(app).delete('/articles/my-article/favorite').set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
+      expect(res.body).toEqual({ article: { slug: 'my-article', favorited: false } });
       expect(articleService.unfavoriteArticle).toHaveBeenCalledWith('my-article', 456);
     });
   });
@@ -196,6 +198,7 @@ describe('article.controller', () => {
       const res = await request(app).delete('/articles/my-article/bookmark').set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
+      expect(res.body).toEqual({ article: { slug: 'my-article', bookmarked: false } });
       expect(articleService.unbookmarkArticle).toHaveBeenCalledWith('my-article', 456);
     });
   });
@@ -227,13 +230,14 @@ describe('article.controller', () => {
     });
 
     test('converts the comment id to a number and deletes it', async () => {
-      (articleService.deleteComment as jest.Mock).mockResolvedValue(undefined);
+      (articleService.deleteComment as jest.Mock).mockResolvedValue({ id: 42, body: 'nice' });
 
       const res = await request(app)
         .delete('/articles/my-article/comments/42')
         .set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
+      expect(res.body).toEqual({ comment: { id: 42, body: 'nice' } });
       expect(articleService.deleteComment).toHaveBeenCalledWith(42, 456);
     });
   });
