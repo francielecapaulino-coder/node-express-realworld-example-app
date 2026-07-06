@@ -495,12 +495,16 @@ export const addComment = async (body: string, slug: string, id: number) => {
     },
   });
 
+  if (!article) {
+    throw new HttpException(404, { errors: { article: ['not found'] } });
+  }
+
   const comment = await prisma.comment.create({
     data: {
       body,
       article: {
         connect: {
-          id: article?.id,
+          id: article.id,
         },
       },
       author: {

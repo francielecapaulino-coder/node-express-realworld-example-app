@@ -62,7 +62,7 @@ const router = Router();
  *               $ref: '#/components/schemas/ArticlesResponse'
  */
 router.get('/articles', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-const result = await getArticles(req.query, req.auth?.user.id);
+const result = await getArticles(req.query, req.auth?.user?.id);
   res.json(result);
 }));
 
@@ -167,7 +167,7 @@ router.post('/articles', auth.required, asyncHandler(async (req: Request, res: R
  *         description: Article not found
  */
 router.get('/articles/:slug', auth.optional, asyncHandler(async (req: Request, res: Response) => {
-  const article = await getArticle(String(req.params.slug), req.auth?.user.id);
+  const article = await getArticle(String(req.params.slug), req.auth?.user?.id);
   res.json({ article });
 }));
 
@@ -441,7 +441,7 @@ router.get(
   '/articles/:slug/comments',
   auth.optional,
   asyncHandler(async (req: Request, res: Response) => {
-const comments = await getCommentsByArticle(String(req.params.slug), req.auth?.user.id);
+const comments = await getCommentsByArticle(String(req.params.slug), req.auth?.user?.id);
     res.json({ comments });
   }),
 );

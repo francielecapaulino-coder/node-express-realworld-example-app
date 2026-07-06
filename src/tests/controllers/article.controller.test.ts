@@ -45,6 +45,16 @@ describe('article.controller', () => {
 
       expect(articleService.getArticles).toHaveBeenCalledWith(expect.anything(), 456);
     });
+
+    test('falls back to no user id (does not crash) when a validly-signed token has no user field', async () => {
+      const shapelessToken = jwt.sign({ sub: 456 }, process.env.JWT_SECRET || 'superSecret', { expiresIn: '60d' });
+      (articleService.getArticles as jest.Mock).mockResolvedValue({ articles: [], articlesCount: 0 });
+
+      const res = await request(app).get('/articles').set('Authorization', `Token ${shapelessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(articleService.getArticles).toHaveBeenCalledWith(expect.anything(), undefined);
+    });
   });
 
   describe('GET /articles/feed', () => {
@@ -134,13 +144,13 @@ describe('article.controller', () => {
       expect(res.status).toBe(401);
     });
 
-    test('deletes the article and returns the { article } envelope', async () => {
-      (articleService.deleteArticle as jest.Mock).mockResolvedValue({ slug: 'my-article' });
+    test('deletes the article and returns an empty body (deleteArticle resolves nothing)', async () => {
+      (articleService.deleteArticle as jest.Mock).mockResolvedValue(undefined);
 
       const res = await request(app).delete('/articles/my-article').set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ article: { slug: 'my-article' } });
+      expect(res.body).toEqual({});
       expect(articleService.deleteArticle).toHaveBeenCalledWith('my-article', 456);
     });
   });
@@ -229,15 +239,15 @@ describe('article.controller', () => {
       expect(res.status).toBe(401);
     });
 
-    test('converts the comment id to a number and deletes it', async () => {
-      (articleService.deleteComment as jest.Mock).mockResolvedValue({ id: 42, body: 'nice' });
+    test('converts the comment id to a number, deletes it, and returns an empty body (deleteComment resolves nothing)', async () => {
+      (articleService.deleteComment as jest.Mock).mockResolvedValue(undefined);
 
       const res = await request(app)
         .delete('/articles/my-article/comments/42')
         .set('Authorization', `Token ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ comment: { id: 42, body: 'nice' } });
+      expect(res.body).toEqual({});
       expect(articleService.deleteComment).toHaveBeenCalledWith(42, 456);
     });
   });

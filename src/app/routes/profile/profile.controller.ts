@@ -33,7 +33,7 @@ router.get(
   '/profiles/:username',
   auth.optional,
   asyncHandler(async (req: Request, res: Response) => {
-    const profile = await getProfile(String(req.params.username), req.auth?.user.id);
+    const profile = await getProfile(String(req.params.username), req.auth?.user?.id);
     res.json({ profile });
   }),
 );

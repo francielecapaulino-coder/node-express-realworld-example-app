@@ -584,21 +584,14 @@ describe('ArticleService', () => {
       expect(prismaMock.comment.create).not.toHaveBeenCalled();
     });
 
-    test('connects the comment to an undefined article id when the article lookup returns nothing', async () => {
+    test('throws a 404 when the article does not exist', async () => {
       prismaMock.article.findUnique.mockResolvedValue(null);
-      prismaMock.comment.create.mockResolvedValue({
-        id: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        body: 'nice article',
-        author: { username: 'RealWorld', bio: null, image: null, followedBy: [] },
-      } as any);
 
-      await addComment('nice article', 'missing-slug', 456);
-
-      expect(prismaMock.comment.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ article: { connect: { id: undefined } } }) }),
-      );
+      await expect(addComment('nice article', 'missing-slug', 456)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
+      expect(prismaMock.comment.create).not.toHaveBeenCalled();
     });
 
     test('marks following true when the current user is in the comment author followedBy list', async () => {
