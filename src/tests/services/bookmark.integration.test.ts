@@ -1,4 +1,5 @@
-import { bookmarkArticle, unbookmarkArticle, getArticle } from '../../app/routes/article/article.service';
+import { getArticle } from '../../app/routes/article/article.service';
+import { bookmarkArticle, unbookmarkArticle } from '../../app/routes/bookmark/bookmark.service';
 
 // Mock the entire module for this test
 jest.mock('../../prisma/prisma-client', () => {
