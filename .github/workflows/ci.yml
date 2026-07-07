@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=src/prisma/schema.prisma
+
+      - name: Typecheck (app)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Typecheck (tests)
+        run: npx tsc --noEmit -p tsconfig.spec.json
+
+      - name: Lint
+        run: npx nx lint api
+
+      - name: Test
+        run: npx nx test api
+
+      - name: Build
+        run: npx nx build api
