@@ -28,11 +28,8 @@ jobs:
       - name: Typecheck (app)
         run: npx tsc --noEmit -p tsconfig.app.json
 
-      - name: Typecheck (tests)
-        run: npx tsc --noEmit -p tsconfig.spec.json
-
       - name: Lint
-        run: npx nx lint api
+        run: npx nx run-many --target=lint --all
 
       - name: Test
         run: npx nx test api
