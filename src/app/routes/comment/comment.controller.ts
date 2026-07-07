@@ -93,8 +93,8 @@ router.delete(
   '/articles/:slug/comments/:id',
   auth.required,
   asyncHandler(async (req: Request, res: Response) => {
-    const comment = await deleteComment(Number(req.params.id), req.auth!.user.id);
-    res.json({ comment });
+    await deleteComment(Number(req.params.id), req.auth!.user.id);
+    res.json({});
   }),
 );
 

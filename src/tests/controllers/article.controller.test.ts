@@ -107,6 +107,16 @@ describe('article.controller', () => {
       expect(articleService.getArticle).toHaveBeenCalledWith('my-article', undefined);
     });
 
+    test('falls back to no user id (does not crash) when a validly-signed token has no user field', async () => {
+      const shapelessToken = jwt.sign({ sub: 456 }, process.env.JWT_SECRET || 'superSecret', { expiresIn: '60d' });
+      (articleService.getArticle as jest.Mock).mockResolvedValue({ slug: 'my-article' });
+
+      const res = await request(app).get('/articles/my-article').set('Authorization', `Token ${shapelessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(articleService.getArticle).toHaveBeenCalledWith('my-article', undefined);
+    });
+
     test('propagates a 404 when the service throws', async () => {
       (articleService.getArticle as jest.Mock).mockRejectedValue(
         new HttpException(404, { errors: { article: ['not found'] } }),

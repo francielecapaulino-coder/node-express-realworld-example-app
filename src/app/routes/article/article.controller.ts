@@ -228,8 +228,8 @@ router.put('/articles/:slug', auth.required, asyncHandler(async (req: Request, r
  *         description: Article not found
  */
 router.delete('/articles/:slug', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const article = await deleteArticle(String(req.params.slug), req.auth!.user.id);
-  res.json({ article });
+  await deleteArticle(String(req.params.slug), req.auth!.user.id);
+  res.json({});
 }));
 
 export default router;

@@ -81,5 +81,13 @@ describe('BookmarkService', () => {
 
       expect(result).toHaveProperty('bookmarked', true);
     });
+
+    test('bookmarked is false when bookmarkedBy contains a different user id', async () => {
+      prismaMock.article.update.mockResolvedValue({ ...mockedArticle, bookmarkedBy: [{ id: 999 }] } as any);
+
+      const result = await unbookmarkArticle(mockedArticle.slug, 1);
+
+      expect(result).toHaveProperty('bookmarked', false);
+    });
   });
 });

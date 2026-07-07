@@ -81,5 +81,13 @@ describe('FavoriteService', () => {
 
       expect(result).toHaveProperty('favorited', true);
     });
+
+    test('favorited is false when favoritedBy contains a different user id', async () => {
+      prismaMock.article.update.mockResolvedValue({ ...mockedArticle, favoritedBy: [{ id: 999 }] } as any);
+
+      const result = await unfavoriteArticle(mockedArticle.slug, 1);
+
+      expect(result).toHaveProperty('favorited', false);
+    });
   });
 });

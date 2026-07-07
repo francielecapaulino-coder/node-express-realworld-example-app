@@ -44,6 +44,16 @@ describe('profile.controller', () => {
 
       expect(profileService.getProfile).toHaveBeenCalledWith('jake', 456);
     });
+
+    test('falls back to no user id (does not crash) when a validly-signed token has no user field', async () => {
+      const shapelessToken = jwt.sign({ sub: 456 }, process.env.JWT_SECRET || 'superSecret', { expiresIn: '60d' });
+      (profileService.getProfile as jest.Mock).mockResolvedValue({ username: 'jake', following: false });
+
+      const res = await request(app).get('/profiles/jake').set('Authorization', `Token ${shapelessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(profileService.getProfile).toHaveBeenCalledWith('jake', undefined);
+    });
   });
 
   describe('POST /profiles/:username/follow', () => {

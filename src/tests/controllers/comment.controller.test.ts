@@ -75,5 +75,17 @@ describe('comment.controller', () => {
       expect(res.body).toEqual({ comments: [{ id: 1, body: 'nice' }] });
       expect(commentService.getCommentsByArticle).toHaveBeenCalledWith('my-article', undefined);
     });
+
+    test('falls back to no user id (does not crash) when a validly-signed token has no user field', async () => {
+      const shapelessToken = jwt.sign({ sub: 456 }, process.env.JWT_SECRET || 'superSecret', { expiresIn: '60d' });
+      (commentService.getCommentsByArticle as jest.Mock).mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/articles/my-article/comments')
+        .set('Authorization', `Token ${shapelessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(commentService.getCommentsByArticle).toHaveBeenCalledWith('my-article', undefined);
+    });
   });
 });
