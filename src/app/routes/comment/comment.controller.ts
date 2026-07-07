@@ -83,7 +83,7 @@ router.post(
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/CommentResponse'
+ *               type: object
  *       401:
  *         description: Missing or invalid authorization credentials
  *       404:

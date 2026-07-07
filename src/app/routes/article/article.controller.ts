@@ -221,7 +221,7 @@ router.put('/articles/:slug', auth.required, asyncHandler(async (req: Request, r
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ArticleResponse'
+ *               type: object
  *       401:
  *         description: Missing or invalid authorization credentials
  *       404:
