@@ -1,6 +1,5 @@
 import prisma from '../../../prisma/prisma-client';
-import profileMapper from '../profile/profile.utils';
-import { Tag } from '../tag/tag.model';
+import { AUTHOR_SELECT, mapRelationArticle } from '../article/article-relation.util';
 
 export const favoriteArticle = async (slugPayload: string, id: number) => {
   const { _count, ...article } = await prisma.article.update({
@@ -21,12 +20,7 @@ export const favoriteArticle = async (slugPayload: string, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -37,15 +31,11 @@ export const favoriteArticle = async (slugPayload: string, id: number) => {
     },
   });
 
-  const result = {
-    ...article,
-    author: profileMapper(article.author, id),
-    tagList: article.tagList.map((tag: Tag) => tag.name),
+  return {
+    ...mapRelationArticle(article, id),
     favorited: article.favoritedBy.some((favorited) => favorited.id === id),
     favoritesCount: _count.favoritedBy,
   };
-
-  return result;
 };
 
 export const unfavoriteArticle = async (slugPayload: string, id: number) => {
@@ -67,12 +57,7 @@ export const unfavoriteArticle = async (slugPayload: string, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -83,13 +68,9 @@ export const unfavoriteArticle = async (slugPayload: string, id: number) => {
     },
   });
 
-  const result = {
-    ...article,
-    author: profileMapper(article.author, id),
-    tagList: article.tagList.map((tag: Tag) => tag.name),
+  return {
+    ...mapRelationArticle(article, id),
     favorited: article.favoritedBy.some((favorited) => favorited.id === id),
     favoritesCount: _count.favoritedBy,
   };
-
-  return result;
 };

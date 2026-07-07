@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../../prisma/prisma-client';
 import HttpException from '../../models/http-exception.model';
 import articleMapper from './article.mapper';
+import { AUTHOR_SELECT } from './article-relation.util';
 
 export interface ArticleInput {
   title?: string;
@@ -97,12 +98,7 @@ export const getArticles = async (query: ArticleListQuery, id?: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -146,12 +142,7 @@ export const getFeed = async (offset: number, limit: number, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -228,12 +219,7 @@ export const createArticle = async (article: ArticleInput, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -259,12 +245,7 @@ export const getArticle = async (slug: string, id?: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {
@@ -372,12 +353,7 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       favoritedBy: true,
       _count: {

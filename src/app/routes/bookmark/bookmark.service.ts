@@ -1,6 +1,5 @@
 import prisma from '../../../prisma/prisma-client';
-import profileMapper from '../profile/profile.utils';
-import { Tag } from '../tag/tag.model';
+import { AUTHOR_SELECT, mapRelationArticle } from '../article/article-relation.util';
 
 export const bookmarkArticle = async (slugPayload: string, id: number) => {
   const { _count, ...article } = await prisma.article.update({
@@ -21,12 +20,7 @@ export const bookmarkArticle = async (slugPayload: string, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       bookmarkedBy: true,
       _count: {
@@ -37,15 +31,11 @@ export const bookmarkArticle = async (slugPayload: string, id: number) => {
     },
   });
 
-  const result = {
-    ...article,
-    author: profileMapper(article.author, id),
-    tagList: article.tagList.map((tag: Tag) => tag.name),
+  return {
+    ...mapRelationArticle(article, id),
     bookmarked: article.bookmarkedBy.some((bookmarked) => bookmarked.id === id),
     bookmarksCount: _count.bookmarkedBy,
   };
-
-  return result;
 };
 
 export const unbookmarkArticle = async (slugPayload: string, id: number) => {
@@ -67,12 +57,7 @@ export const unbookmarkArticle = async (slugPayload: string, id: number) => {
         },
       },
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
       bookmarkedBy: true,
       _count: {
@@ -83,13 +68,9 @@ export const unbookmarkArticle = async (slugPayload: string, id: number) => {
     },
   });
 
-  const result = {
-    ...article,
-    author: profileMapper(article.author, id),
-    tagList: article.tagList.map((tag: Tag) => tag.name),
+  return {
+    ...mapRelationArticle(article, id),
     bookmarked: article.bookmarkedBy.some((bookmarked) => bookmarked.id === id),
     bookmarksCount: _count.bookmarkedBy,
   };
-
-  return result;
 };

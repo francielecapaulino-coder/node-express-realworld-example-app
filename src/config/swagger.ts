@@ -321,10 +321,6 @@ const options = {
   },
   apis: [
     './src/app/routes/**/*.ts',
-    './src/app/routes/auth/auth.controller.ts',
-    './src/app/routes/article/article.controller.ts', 
-    './src/app/routes/profile/profile.controller.ts',
-    './src/app/routes/tag/tag.controller.ts',
     './src/main.ts',
   ],
 };

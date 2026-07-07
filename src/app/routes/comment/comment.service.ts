@@ -1,5 +1,7 @@
 import prisma from '../../../prisma/prisma-client';
 import HttpException from '../../models/http-exception.model';
+import authorMapper from '../article/author.mapper';
+import { AUTHOR_SELECT } from '../article/article-relation.util';
 
 export const getCommentsByArticle = async (slug: string, id?: number) => {
   const queries = [];
@@ -33,12 +35,7 @@ export const getCommentsByArticle = async (slug: string, id?: number) => {
           updatedAt: true,
           body: true,
           author: {
-            select: {
-              username: true,
-              bio: true,
-              image: true,
-              followedBy: true,
-            },
+            select: AUTHOR_SELECT,
           },
         },
       },
@@ -47,12 +44,7 @@ export const getCommentsByArticle = async (slug: string, id?: number) => {
 
   const result = comments?.comments.map((comment) => ({
     ...comment,
-    author: {
-      username: comment.author.username,
-      bio: comment.author.bio,
-      image: comment.author.image,
-      following: comment.author.followedBy.some((follow) => follow.id === id),
-    },
+    author: authorMapper(comment.author, id),
   }));
 
   return result;
@@ -92,12 +84,7 @@ export const addComment = async (body: string, slug: string, id: number) => {
     },
     include: {
       author: {
-        select: {
-          username: true,
-          bio: true,
-          image: true,
-          followedBy: true,
-        },
+        select: AUTHOR_SELECT,
       },
     },
   });
@@ -107,12 +94,7 @@ export const addComment = async (body: string, slug: string, id: number) => {
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
     body: comment.body,
-    author: {
-      username: comment.author.username,
-      bio: comment.author.bio,
-      image: comment.author.image,
-      following: comment.author.followedBy.some((follow) => follow.id === id),
-    },
+    author: authorMapper(comment.author, id),
   };
 };
 

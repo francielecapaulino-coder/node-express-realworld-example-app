@@ -1,6 +1,7 @@
 jest.mock('../../prisma/prisma-client');
 
 import prismaMock from '../prisma-mock';
+import { mappedAuthor, mockedArticle } from '../fixtures/article.fixture';
 import { bookmarkArticle, unbookmarkArticle } from '../../app/routes/bookmark/bookmark.service';
 
 const BOOKMARK_INCLUDE = {
@@ -9,29 +10,6 @@ const BOOKMARK_INCLUDE = {
   bookmarkedBy: true,
   _count: { select: { bookmarkedBy: true } },
 };
-
-const mockedArticle = {
-  id: 123,
-  slug: 'how-to-train-your-dragon-1',
-  title: 'How to train your dragon',
-  description: 'desc',
-  body: 'body',
-  createdAt: new Date('2024-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2024-01-02T00:00:00.000Z'),
-  authorId: 456,
-  tagList: [{ name: 'dragons' }],
-  favoritedBy: [],
-  bookmarkedBy: [],
-  _count: { favoritedBy: 0, bookmarkedBy: 0 },
-  author: {
-    username: 'RealWorld',
-    bio: null,
-    image: null,
-    followedBy: [],
-  },
-};
-
-const mappedAuthor = { username: 'RealWorld', bio: null, image: null, following: false };
 
 describe('BookmarkService', () => {
   describe('bookmarkArticle', () => {
