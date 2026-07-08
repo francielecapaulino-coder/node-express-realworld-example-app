@@ -51,3 +51,9 @@ Thumbs.db
 /reports
 migrations.json
 __pycache__
+
+# Internal agent planning/context docs — local only, never commit
+documentação/
+harness/
+AGENTS.md
+CLAUDE.md

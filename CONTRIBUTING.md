@@ -4,9 +4,10 @@
 
 1. **Open an issue before starting work**, using one of the templates under
    [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) (`task`, `bug_report`, or
-   `feature_request`). Every template includes a **Definition of Ready** and a
-   **Definition of Done** checklist — fill in the DoR before you start coding, and
-   don't close the issue (or merge the PR) until the DoD is satisfied.
+   `feature_request`). Every template includes a **Definition of Done** checklist —
+   don't close the issue (or merge the PR) until it's satisfied. The `task` template
+   also has a **Definition of Ready** section; fill it in before you start coding
+   when opening that kind of issue.
 2. **Reference the issue number in every commit**, using
    [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <summary> (#<id>)`.
    Example: `fix(auth): restore defensive optional chaining on auth-optional routes (#8)`.
@@ -48,6 +49,6 @@ Review the generated SQL under `src/prisma/migrations/` before committing it.
 ## What stays out of version control
 
 `documentação/`, `harness/`, `AGENTS.md`, and `CLAUDE.md` are internal,
-local-only planning/agent-context files — they must never be committed. They
-are listed in `.git/info/exclude` (a local, unversioned exclude list) so an
-accidental `git add -A` doesn't pick them up.
+local-only planning/agent-context files — they must never be committed. They're
+listed in the repo's `.gitignore`, so a `git add -A` won't pick them up on any
+clone.

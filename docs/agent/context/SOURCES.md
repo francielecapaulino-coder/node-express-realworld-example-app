@@ -5,7 +5,7 @@ SKILL: o `description` é o gatilho casado com a intenção das unidades de trab
 
 | Caminho | Tipo | Autoridade | Status | Escopo / gatilho |
 |---|---|---|---|---|
-| `documentação/GUIA-DE-REFATORACAO.md` | prd | authoritative | in-repo (não commitado) | Documento-fonte de verdade; governa todas as slices; §2 corrige premissas do documento-fonte externo |
+| `documentação/GUIA-DE-REFATORACAO.md` | prd | authoritative | local-only, gitignored (não existe em clones novos) | Documento-fonte de verdade; governa todas as slices; §2 corrige premissas do documento-fonte externo |
 | `src/prisma/schema.prisma` | outro | authoritative | in-repo | Schema de banco; toda mudança de entidade referencia este arquivo |
 | `README.md` | outro | reference | in-repo | Setup, seed, deploy básico |
 | `src/app/routes/article/article.controller.ts` | outro | reference | in-repo | Referência de padrão de controller (rotas, auth, envelopes) para §4.2 e §4.5 |
@@ -22,7 +22,7 @@ Ver `docs/agent/context/SKILLS.md` — registry completo de skills Coda disponí
 mapeamento por fase do roadmap, skills ausentes e constraints de uso.
 
 Registro detalhado por etapa (prompts + comentários): `documentação/PROMPTS-AND-SKILLS.md`
-(não commitado — §13 do guia).
+(local-only, gitignored — não existe em clones novos; ver `CONTRIBUTING.md`).
 
 ## DESIGN
 Não aplicável — projeto backend sem frontend.

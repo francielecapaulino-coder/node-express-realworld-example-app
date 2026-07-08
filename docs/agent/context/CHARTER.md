@@ -15,7 +15,8 @@ sem alterar o contrato público da API.
 ## Escopo do projeto
 O backend é uma **API REST pura** (sem frontend próprio). Toda evolução deve:
 1. **Preservar o contrato RealWorld** (rotas, envelopes, formato de erro) — §3 do guia.
-2. **Seguir o GUIA-DE-REFATORACAO.md** como documento-fonte de verdade.
+2. **Seguir o GUIA-DE-REFATORACAO.md** como documento-fonte de verdade (arquivo local-only,
+   `documentação/`, listado no `.gitignore` — não existe em clones novos; ver `CONTRIBUTING.md`).
 3. **Abrir issue antes de codar**; todo commit referencia `#<id>`.
 4. **Usar Conventional Commits** em todos os commits.
 
@@ -38,7 +39,7 @@ O backend é uma **API REST pura** (sem frontend próprio). Toda evolução deve
 | Bookmark = nova migração Prisma | Gerar migração versionada; nunca `db push` |
 | `strict` desligado + `any`/`@ts-ignore` | Habilitar progressivamente (§4.1) |
 | e2e stale (`Hello API`) | Corrigir na fase de rede de segurança |
-| Itens que nunca devem ser commitados | `documentacao/`, `harness/`, `AGENTS.md`, `CLAUDE.md` → `.git/info/exclude` local |
+| Itens que nunca devem ser commitados | `documentação/`, `harness/`, `AGENTS.md`, `CLAUDE.md` → `.gitignore` |
 
 ## Stack e restrições
 - **Linguagem:** TypeScript 5.2.2 (`strict` desligado; alvo: habilitar em §4.1)

@@ -35,7 +35,8 @@ atuais da API.
 ## Origem e fase
 - Fase (ROADMAP): 5 — Qualidade (antecipada por decisão explícita do usuário;
   o ROADMAP.md permite ordem flexível exceto Fase 2 antes de Fase 3)
-- Documento/bloco de origem: GUIA-DE-REFATORACAO.md §5.6 e §11
+- Documento/bloco de origem: GUIA-DE-REFATORACAO.md §5.6 e §11 (arquivo local-only,
+  gitignored — não existe em clones novos; ver `CONTRIBUTING.md`)
 - context_sources:
   - skills: []
   - design: null

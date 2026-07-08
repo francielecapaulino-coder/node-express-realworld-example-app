@@ -1,6 +1,7 @@
 # ROADMAP — Conduit Backend
 
-> Fonte: `documentação/GUIA-DE-REFATORACAO.md` §15.
+> Fonte: `documentação/GUIA-DE-REFATORACAO.md` §15 (arquivo local-only, gitignored —
+> não existe em clones novos; ver `CONTRIBUTING.md`).
 > Ordem obrigatória: Fase 2 (rede de segurança) ANTES das refatorações (Fase 3).
 > As demais fases são flexíveis em sequência interna.
 
@@ -11,7 +12,7 @@
 
 ### Incluído
 - Criar templates de issues GitHub (bug, feature, needs-decision) + DoR/DoD documentados no repo
-- Configurar `.git/info/exclude` local para `documentacao/`, `harness/`, `AGENTS.md`, `CLAUDE.md`
+- Configurar `.gitignore` para `documentação/`, `harness/`, `AGENTS.md`, `CLAUDE.md` [DONE]
 - Definir e documentar bleeding branch (Conventional Commits automáticos)
 - Conventional Commits configurados e validados (commitlint ou similar)
 

@@ -4,7 +4,8 @@ Registry of Coda skills available to this project, their role in the workflow,
 and notes on skills that are needed but not yet available.
 
 > Full prompt-by-prompt log (including non-committed content) lives in
-> `documentação/PROMPTS-AND-SKILLS.md` (not versioned — §13 of the guide).
+> `documentação/PROMPTS-AND-SKILLS.md` (local-only, gitignored — doesn't exist
+> in fresh clones; see `CONTRIBUTING.md`).
 
 ---
 
