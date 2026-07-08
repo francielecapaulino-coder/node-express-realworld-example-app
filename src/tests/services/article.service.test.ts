@@ -18,8 +18,8 @@ import {
 // include/select object literals themselves.
 const ARTICLE_INCLUDE = {
   tagList: { select: { name: true } },
-  author: { select: { username: true, bio: true, image: true, followedBy: true } },
-  favoritedBy: true,
+  author: { select: { username: true, bio: true, image: true, followedBy: { select: { id: true } } } },
+  favoritedBy: { select: { id: true } },
   _count: { select: { favoritedBy: true } },
 };
 
@@ -303,32 +303,42 @@ describe('ArticleService', () => {
       );
     });
 
-    test('disconnects existing tags before reconnecting the new ones', async () => {
+    test('disconnects existing tags before reconnecting the new ones, when tagList is provided', async () => {
       prismaMock.article.findFirst
         .mockResolvedValueOnce({ author: { id: 456, username: 'RealWorld' } } as any)
         .mockResolvedValueOnce(null);
       prismaMock.article.update.mockResolvedValue(mockedArticle);
 
-      await updateArticle({ title: 'New title' }, mockedArticle.slug, 456);
+      await updateArticle({ title: 'New title', tagList: ['newtag'] }, mockedArticle.slug, 456);
 
       expect(prismaMock.article.update).toHaveBeenNthCalledWith(1, {
         where: { slug: mockedArticle.slug },
         data: { tagList: { set: [] } },
       });
+      expect(prismaMock.article.update).toHaveBeenNthCalledWith(2, {
+        where: { slug: mockedArticle.slug },
+        data: {
+          title: 'New title',
+          slug: 'New-title-456',
+          updatedAt: expect.any(Date),
+          tagList: { connectOrCreate: [{ create: { name: 'newtag' }, where: { name: 'newtag' } }] },
+        },
+        include: ARTICLE_INCLUDE,
+      });
     });
 
-    test('does not touch the slug or tagList when neither title nor tagList are provided', async () => {
+    test('does not touch tags at all when tagList is not provided (regression: used to silently wipe them)', async () => {
       prismaMock.article.findFirst.mockResolvedValueOnce({ author: { id: 456, username: 'RealWorld' } } as any);
       prismaMock.article.update.mockResolvedValue(mockedArticle);
 
       await updateArticle({ body: 'only the body changes' }, mockedArticle.slug, 456);
 
-      expect(prismaMock.article.update).toHaveBeenNthCalledWith(2, {
+      expect(prismaMock.article.update).toHaveBeenCalledTimes(1);
+      expect(prismaMock.article.update).toHaveBeenCalledWith({
         where: { slug: mockedArticle.slug },
         data: {
           body: 'only the body changes',
           updatedAt: expect.any(Date),
-          tagList: { connectOrCreate: [] },
         },
         include: ARTICLE_INCLUDE,
       });

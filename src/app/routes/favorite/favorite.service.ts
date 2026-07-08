@@ -22,7 +22,11 @@ export const favoriteArticle = async (slugPayload: string, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
@@ -59,7 +63,11 @@ export const unfavoriteArticle = async (slugPayload: string, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,

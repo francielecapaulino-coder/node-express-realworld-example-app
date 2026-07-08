@@ -33,7 +33,7 @@ describe('CommentService', () => {
               createdAt: true,
               updatedAt: true,
               body: true,
-              author: { select: { username: true, bio: true, image: true, followedBy: true } },
+              author: { select: { username: true, bio: true, image: true, followedBy: { select: { id: true } } } },
             },
           },
         },
@@ -116,7 +116,7 @@ describe('CommentService', () => {
           author: { connect: { id: 456 } },
         },
         include: {
-          author: { select: { username: true, bio: true, image: true, followedBy: true } },
+          author: { select: { username: true, bio: true, image: true, followedBy: { select: { id: true } } } },
         },
       });
       expect(result).toEqual({

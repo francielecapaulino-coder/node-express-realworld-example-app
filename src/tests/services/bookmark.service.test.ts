@@ -6,8 +6,8 @@ import { bookmarkArticle, unbookmarkArticle } from '../../app/routes/bookmark/bo
 
 const BOOKMARK_INCLUDE = {
   tagList: { select: { name: true } },
-  author: { select: { username: true, bio: true, image: true, followedBy: true } },
-  bookmarkedBy: true,
+  author: { select: { username: true, bio: true, image: true, followedBy: { select: { id: true } } } },
+  bookmarkedBy: { select: { id: true } },
   _count: { select: { bookmarkedBy: true } },
 };
 

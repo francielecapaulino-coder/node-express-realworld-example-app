@@ -3,12 +3,19 @@ import { Tag } from '../tag/tag.model';
 import { AuthorWithFollowers } from './author.mapper';
 
 // Shared by every query (article/comment/favorite/bookmark) that includes the
-// article's author, so the projection can't drift between endpoints.
+// article's author, so the projection can't drift between endpoints. followedBy
+// only needs `id` (authorMapper/profileMapper just check membership) — selecting
+// full User rows here would leak password/email into responses that spread the
+// author object without going through a mapper.
 export const AUTHOR_SELECT = {
   username: true,
   bio: true,
   image: true,
-  followedBy: true,
+  followedBy: {
+    select: {
+      id: true,
+    },
+  },
 } as const;
 
 interface RelationArticleBase {

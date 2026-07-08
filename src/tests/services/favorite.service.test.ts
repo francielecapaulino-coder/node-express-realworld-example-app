@@ -6,8 +6,8 @@ import { favoriteArticle, unfavoriteArticle } from '../../app/routes/favorite/fa
 
 const ARTICLE_INCLUDE = {
   tagList: { select: { name: true } },
-  author: { select: { username: true, bio: true, image: true, followedBy: true } },
-  favoritedBy: true,
+  author: { select: { username: true, bio: true, image: true, followedBy: { select: { id: true } } } },
+  favoritedBy: { select: { id: true } },
   _count: { select: { favoritedBy: true } },
 };
 

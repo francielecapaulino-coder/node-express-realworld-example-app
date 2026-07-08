@@ -22,7 +22,11 @@ export const bookmarkArticle = async (slugPayload: string, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      bookmarkedBy: true,
+      bookmarkedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           bookmarkedBy: true,
@@ -59,7 +63,11 @@ export const unbookmarkArticle = async (slugPayload: string, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      bookmarkedBy: true,
+      bookmarkedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           bookmarkedBy: true,

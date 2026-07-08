@@ -100,7 +100,11 @@ export const getArticles = async (query: ArticleListQuery, id?: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
@@ -144,7 +148,11 @@ export const getFeed = async (offset: number, limit: number, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
@@ -221,7 +229,11 @@ export const createArticle = async (article: ArticleInput, id: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
@@ -247,7 +259,11 @@ export const getArticle = async (slug: string, id?: number) => {
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
@@ -322,6 +338,9 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
     }
   }
 
+  // Only touch tags when the request actually included a tagList — otherwise
+  // an update that only changes e.g. the title would silently wipe them.
+  const tagListProvided = 'tagList' in article;
   const tagList =
     Array.isArray(article.tagList) && article.tagList.length
       ? article.tagList.map((tag: string) => ({
@@ -330,7 +349,9 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
         }))
       : [];
 
-  await disconnectArticlesTags(slug);
+  if (tagListProvided) {
+    await disconnectArticlesTags(slug);
+  }
 
   const updatedArticle = await prisma.article.update({
     where: {
@@ -342,9 +363,7 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
       ...(article.description ? { description: article.description } : {}),
       ...(newSlug ? { slug: newSlug } : {}),
       updatedAt: new Date(),
-      tagList: {
-        connectOrCreate: tagList,
-      },
+      ...(tagListProvided ? { tagList: { connectOrCreate: tagList } } : {}),
     },
     include: {
       tagList: {
@@ -355,7 +374,11 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
       author: {
         select: AUTHOR_SELECT,
       },
-      favoritedBy: true,
+      favoritedBy: {
+        select: {
+          id: true,
+        },
+      },
       _count: {
         select: {
           favoritedBy: true,
