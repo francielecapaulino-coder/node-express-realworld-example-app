@@ -34,6 +34,7 @@ import { Request, Response } from 'express';
 import logger from '../../logger';
 import {
   httpMetricsMiddleware,
+  metricsAuthMiddleware,
   getMetricsData,
   resetMetrics,
   metricsHandler,
@@ -52,10 +53,19 @@ const buildReq = (overrides: Partial<Request> = {}): Request =>
     ...overrides,
   } as unknown as Request);
 
+// Mimics just enough of Response's EventEmitter surface (on/emit) for
+// httpMetricsMiddleware's res.on('finish'|'close') listeners.
 const buildRes = (): Response => {
+  const listeners: Record<string, Array<() => void>> = {};
   const res: any = {
     statusCode: 200,
-    end: jest.fn(),
+    on: jest.fn((event: string, cb: () => void) => {
+      (listeners[event] ||= []).push(cb);
+      return res;
+    }),
+    emit: (event: string) => {
+      (listeners[event] || []).forEach((cb) => cb());
+    },
     json: jest.fn(),
     set: jest.fn(),
     send: jest.fn(),
@@ -64,8 +74,8 @@ const buildRes = (): Response => {
   return res as unknown as Response;
 };
 
-const end = (res: Response, ...args: unknown[]) =>
-  (res.end as unknown as (...a: unknown[]) => void)(...args);
+const finish = (res: Response) => (res as any).emit('finish');
+const close = (res: Response) => (res as any).emit('close');
 
 describe('httpMetricsMiddleware', () => {
   beforeEach(() => {
@@ -84,7 +94,7 @@ describe('httpMetricsMiddleware', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  test('increments totalRequests and per-endpoint counts, and logs request start', () => {
+  test('increments totalRequests and logs request start', () => {
     const req = buildReq();
     const res = buildRes();
 
@@ -115,7 +125,7 @@ describe('httpMetricsMiddleware', () => {
       '[HTTP_METRICS] Request started',
     );
 
-    end(res);
+    finish(res);
 
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'req-abc-123' }),
@@ -124,48 +134,87 @@ describe('httpMetricsMiddleware', () => {
   });
 
   test('increments the same endpoint key across repeated requests instead of resetting it', () => {
-    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
-    httpMetricsMiddleware(buildReq(), buildRes(), jest.fn());
+    const res1 = buildRes();
+    const res2 = buildRes();
+    httpMetricsMiddleware(buildReq(), res1, jest.fn());
+    finish(res1);
+    httpMetricsMiddleware(buildReq(), res2, jest.fn());
+    finish(res2);
 
     expect(getMetricsData().endpointCounts.get('GET /api/articles')).toBe(2);
   });
 
-  test('falls back to req.path when req.route is not set (e.g. unmatched routes)', () => {
-    const req = buildReq({ route: undefined, path: '/unmatched' });
+  test('falls back to a fixed "unmatched" label when req.route is not set (e.g. unmatched routes), instead of the raw path', () => {
+    const req = buildReq({ route: undefined, path: '/some-random-probed-path' });
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
+    finish(res);
 
-    expect(getMetricsData().endpointCounts.get('GET /unmatched')).toBe(1);
-    expect(mockInstruments['http_requests_total'].add).toHaveBeenCalledWith(1, {
-      method: 'GET',
-      route: '/unmatched',
-      status_code: 'pending',
-    });
+    expect(getMetricsData().endpointCounts.get('GET unmatched')).toBe(1);
+    expect(getMetricsData().endpointCounts.get('GET /some-random-probed-path')).toBeUndefined();
   });
 
-  test('increments activeGauge on start and decrements it on completion', () => {
+  test('increments activeGauge on start and decrements it once on finish', () => {
     const req = buildReq();
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
     expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledWith(1);
 
-    end(res);
+    finish(res);
     expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledWith(-1);
+    expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledTimes(2);
   });
 
-  test('records the pending request counter and endpoint counter with the exact labels', () => {
+  test('decrements activeGauge on close even if finish never fires (aborted connection)', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    close(res);
+
+    expect(mockInstruments['http_active_connections'].add).toHaveBeenLastCalledWith(-1);
+    expect(getMetricsData().activeConnections).toBe(0);
+  });
+
+  test('does not double-decrement activeConnections when close fires after finish', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    finish(res);
+    close(res);
+
+    expect(mockInstruments['http_active_connections'].add).toHaveBeenCalledTimes(2);
+    expect(getMetricsData().activeConnections).toBe(0);
+  });
+
+  test('does not record request/duration/endpoint counters at request start (only on completion)', () => {
     const req = buildReq();
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
 
+    expect(mockInstruments['http_requests_total'].add).not.toHaveBeenCalled();
+    expect(mockInstruments['http_requests_endpoint_total'].add).not.toHaveBeenCalled();
+  });
+
+  test('records the request counter and endpoint counter exactly once, with the real status code', () => {
+    const req = buildReq();
+    const res = buildRes();
+
+    httpMetricsMiddleware(req, res, jest.fn());
+    res.statusCode = 201;
+    finish(res);
+
+    expect(mockInstruments['http_requests_total'].add).toHaveBeenCalledTimes(1);
     expect(mockInstruments['http_requests_total'].add).toHaveBeenCalledWith(1, {
       method: 'GET',
-      route: '/api/articles',
-      status_code: 'pending',
+      route: 'GET /api/articles',
+      status_code: '201',
     });
+    expect(mockInstruments['http_requests_endpoint_total'].add).toHaveBeenCalledTimes(1);
     expect(mockInstruments['http_requests_endpoint_total'].add).toHaveBeenCalledWith(1, {
       method: 'GET',
       endpoint: 'GET /api/articles',
@@ -180,12 +229,12 @@ describe('httpMetricsMiddleware', () => {
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
-    end(res);
+    finish(res);
 
     expect(getMetricsData().totalResponseTime).toBe(0.5);
     expect(mockInstruments['http_request_duration_seconds'].record).toHaveBeenCalledWith(0.5, {
       method: 'GET',
-      route: '/api/articles',
+      route: 'GET /api/articles',
       status_code: '200',
     });
     expect(logger.info).toHaveBeenCalledWith(
@@ -194,27 +243,27 @@ describe('httpMetricsMiddleware', () => {
     );
   });
 
-  test('falls back to req.path for the route label in error/duration/final-counter metrics when req.route is not set', () => {
+  test('falls back to the "unmatched" label for the error/duration/final-counter metrics when req.route is not set', () => {
     const req = buildReq({ route: undefined, path: '/unmatched' });
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 500;
-    end(res);
+    finish(res);
 
     expect(mockInstruments['http_requests_errors_total'].add).toHaveBeenCalledWith(1, {
       method: 'GET',
-      route: '/unmatched',
+      route: 'GET unmatched',
       status_code: 500,
     });
     expect(mockInstruments['http_request_duration_seconds'].record).toHaveBeenCalledWith(expect.any(Number), {
       method: 'GET',
-      route: '/unmatched',
+      route: 'GET unmatched',
       status_code: '500',
     });
     expect(mockInstruments['http_requests_total'].add).toHaveBeenLastCalledWith(1, {
       method: 'GET',
-      route: '/unmatched',
+      route: 'GET unmatched',
       status_code: '500',
     });
   });
@@ -225,7 +274,7 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 200;
-    end(res);
+    finish(res);
 
     const data = getMetricsData();
     expect(data.errorCount).toBe(0);
@@ -242,13 +291,13 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 404;
-    end(res);
+    finish(res);
 
     const data = getMetricsData();
     expect(data.errorCount).toBe(1);
     expect(mockInstruments['http_requests_errors_total'].add).toHaveBeenCalledWith(1, {
       method: 'GET',
-      route: '/api/articles',
+      route: 'GET /api/articles',
       status_code: 404,
     });
     expect(logger.warn).toHaveBeenCalledWith(
@@ -263,7 +312,7 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 400;
-    end(res);
+    finish(res);
 
     expect(getMetricsData().errorCount).toBe(1);
   });
@@ -274,31 +323,20 @@ describe('httpMetricsMiddleware', () => {
 
     httpMetricsMiddleware(req, res, jest.fn());
     res.statusCode = 399;
-    end(res);
+    finish(res);
 
     expect(getMetricsData().errorCount).toBe(0);
   });
 
-  test('decrements active connections back to 0 once the response ends', () => {
+  test('decrements active connections back to 0 once the response finishes', () => {
     const req = buildReq();
     const res = buildRes();
 
     httpMetricsMiddleware(req, res, jest.fn());
     expect(getMetricsData().activeConnections).toBe(1);
 
-    end(res);
+    finish(res);
     expect(getMetricsData().activeConnections).toBe(0);
-  });
-
-  test('forwards chunk/encoding to the original res.end', () => {
-    const req = buildReq();
-    const res = buildRes();
-    const originalEnd = res.end;
-
-    httpMetricsMiddleware(req, res, jest.fn());
-    end(res, 'body', 'utf-8');
-
-    expect(originalEnd).toHaveBeenCalledWith('body', 'utf-8', undefined);
   });
 });
 
@@ -316,14 +354,14 @@ describe('getMetricsData', () => {
     nowSpy.mockReturnValueOnce(0).mockReturnValueOnce(1000); // request 1: 1s
     const res1 = buildRes();
     httpMetricsMiddleware(buildReq(), res1, jest.fn());
-    end(res1);
+    finish(res1);
     nowSpy.mockRestore();
 
     const nowSpy2 = jest.spyOn(Date, 'now');
     nowSpy2.mockReturnValueOnce(2000).mockReturnValueOnce(2500); // request 2: 0.5s
     const res2 = buildRes();
     httpMetricsMiddleware(buildReq(), res2, jest.fn());
-    end(res2);
+    finish(res2);
     nowSpy2.mockRestore();
 
     const data = getMetricsData();
@@ -344,6 +382,53 @@ describe('resetMetrics', () => {
     expect(data.errorCount).toBe(0);
     expect(data.activeConnections).toBe(0);
     expect(data.endpointCounts.size).toBe(0);
+  });
+});
+
+describe('metricsAuthMiddleware', () => {
+  const originalToken = process.env.METRICS_TOKEN;
+
+  afterEach(() => {
+    process.env.METRICS_TOKEN = originalToken;
+  });
+
+  test('rejects requests with a 401 when the x-metrics-token header is missing', () => {
+    process.env.METRICS_TOKEN = 'secret-token';
+    const req = { headers: {} } as Request;
+    const res = buildRes();
+    const next = jest.fn();
+
+    metricsAuthMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      errors: { authorization: ['missing or invalid metrics token'] },
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('rejects requests with a mismatched x-metrics-token header', () => {
+    process.env.METRICS_TOKEN = 'secret-token';
+    const req = { headers: { 'x-metrics-token': 'wrong-token' } } as unknown as Request;
+    const res = buildRes();
+    const next = jest.fn();
+
+    metricsAuthMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('calls next() when the x-metrics-token header matches METRICS_TOKEN', () => {
+    process.env.METRICS_TOKEN = 'secret-token';
+    const req = { headers: { 'x-metrics-token': 'secret-token' } } as unknown as Request;
+    const res = buildRes();
+    const next = jest.fn();
+
+    metricsAuthMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
 
@@ -370,13 +455,13 @@ describe('metricsHandler', () => {
     const req = buildReq();
     const okRes = buildRes();
     httpMetricsMiddleware(req, okRes, jest.fn());
-    end(okRes);
+    finish(okRes);
 
     const errReq = buildReq();
     const errRes = buildRes();
     httpMetricsMiddleware(errReq, errRes, jest.fn());
     errRes.statusCode = 500;
-    end(errRes);
+    finish(errRes);
 
     const res = buildRes();
     await metricsHandler({} as Request, res);

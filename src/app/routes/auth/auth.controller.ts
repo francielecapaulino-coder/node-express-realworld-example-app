@@ -2,7 +2,7 @@ import { Request, Response, Router } from 'express';
 import { asyncHandler } from '../../middleware/error-handler.middleware';
 import auth from './auth';
 import { createUser, getCurrentUser, login, updateUser } from './auth.service';
-import { loginRateLimit } from '../../middleware/rate-limit.middleware';
+import { loginRateLimit, registrationRateLimit } from '../../middleware/rate-limit.middleware';
 
 const router = Router();
 
@@ -44,8 +44,19 @@ const router = Router();
  *                   example:
  *                     username: ["has already been taken"]
  *                     email: ["has already been taken"]
+ *       429:
+ *         description: Too many registration attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errors:
+ *                   type: object
+ *                   example:
+ *                     rate-limit: ["Too many registration attempts from this IP, please try again after 15 minutes"]
  */
-router.post('/users', asyncHandler(async (req: Request, res: Response) => {
+router.post('/users', registrationRateLimit, asyncHandler(async (req: Request, res: Response) => {
   const user = await createUser({ ...req.body.user, demo: false });
   res.status(201).json({ user });
 }));

@@ -1,6 +1,7 @@
 jest.mock('../../app/routes/auth/auth.service');
 jest.mock('../../app/middleware/rate-limit.middleware', () => ({
   loginRateLimit: (req: unknown, res: unknown, next: () => void) => next(),
+  registrationRateLimit: (req: unknown, res: unknown, next: () => void) => next(),
 }));
 
 import * as jwt from 'jsonwebtoken';

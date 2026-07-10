@@ -4,13 +4,13 @@ import logger from '../../logger';
 
 /**
  * HTTP Metrics Middleware for LGTM Stack Integration
- * 
+ *
  * This middleware tracks:
  *  - Request count per endpoint
- *  - Response time metrics  
+ *  - Response time metrics
  *  - Error rate tracking
  *  - Active connections monitoring
- * 
+ *
  * Metrics are exported to Prometheus via OpenTelemetry
  */
 
@@ -58,33 +58,26 @@ const endpointCounter = meter.createCounter('http_requests_endpoint_total', {
 });
 
 /**
- * Express middleware to track HTTP metrics
+ * Express middleware to track HTTP metrics.
+ *
+ * Uses res.on('finish'/'close') instead of monkey-patching res.end: 'finish'
+ * fires once the response is fully sent (and by then req.route is populated,
+ * since Express only sets it while dispatching to the matched route handler,
+ * which runs before this middleware's own code executes); 'close' also fires
+ * for aborted/timed-out connections that never reach 'finish', so
+ * activeConnections can't leak on those. req.route is still unset for
+ * genuinely unmatched routes (404s), which fall back to a fixed 'unmatched'
+ * label instead of the raw path — collapsing an unbounded number of distinct
+ * probed paths into one series instead of growing endpointCounts/label
+ * cardinality without bound.
  */
 export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const startTime = Date.now();
-  
-  // Increment active connections
+
   metricsData.activeConnections++;
   activeGauge.add(1);
-  
-  // Track endpoint
-  const endpoint = `${req.method} ${req.route?.path || req.path}`;
   metricsData.totalRequests++;
-  metricsData.endpointCounts.set(endpoint, (metricsData.endpointCounts.get(endpoint) || 0) + 1);
-  
-  // Count request metrics
-  requestCounter.add(1, {
-    method: req.method,
-    route: req.route?.path || req.path,
-    status_code: 'pending',
-  });
-  
-  endpointCounter.add(1, {
-    method: req.method,
-    endpoint: endpoint,
-  });
-  
-  // Log request start
+
   logger.info({
     method: req.method,
     url: req.url,
@@ -92,46 +85,52 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
     ip: req.ip,
     requestId: req.headers['x-request-id'],
   }, '[HTTP_METRICS] Request started');
-  
-// Override res.end to track completion
-  const originalEnd = res.end;
-  // res.end has multiple overloaded signatures upstream (chunk/encoding/callback in varying
-  // combinations); reassigning it to a single wider signature needs an `any` cast here.
-  (res.end as any) = function (this: Response, chunk?: unknown, encoding?: BufferEncoding, cb?: () => void) {
-    const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000; // Convert to seconds
-    
-    metricsData.totalResponseTime += duration;
+
+  let connectionReleased = false;
+  const releaseConnection = () => {
+    if (connectionReleased) return;
+    connectionReleased = true;
     metricsData.activeConnections--;
     activeGauge.add(-1);
-    
+  };
+
+  res.on('finish', () => {
+    releaseConnection();
+
+    const duration = (Date.now() - startTime) / 1000;
+    const endpoint = `${req.method} ${req.route?.path || 'unmatched'}`;
     const statusCode = res.statusCode;
     const isError = statusCode >= 400;
-    
+
+    metricsData.totalResponseTime += duration;
+    metricsData.endpointCounts.set(endpoint, (metricsData.endpointCounts.get(endpoint) || 0) + 1);
+
     if (isError) {
       metricsData.errorCount++;
       errorCounter.add(1, {
         method: req.method,
-        route: req.route?.path || req.path,
+        route: endpoint,
         status_code: statusCode,
       });
     }
-    
-    // Record duration metric
+
     requestDuration.record(duration, {
       method: req.method,
-      route: req.route?.path || req.path,
+      route: endpoint,
       status_code: statusCode.toString(),
     });
-    
-    // Update final request counter with status
+
     requestCounter.add(1, {
       method: req.method,
-      route: req.route?.path || req.path,
+      route: endpoint,
       status_code: statusCode.toString(),
     });
-    
-// Log request completion
+
+    endpointCounter.add(1, {
+      method: req.method,
+      endpoint,
+    });
+
     const logLevel = isError ? 'warn' : 'info';
     logger[logLevel]({
       method: req.method,
@@ -143,11 +142,10 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
       errorCount: metricsData.errorCount,
       totalRequests: metricsData.totalRequests,
     }, '[HTTP_METRICS] Request completed');
-    
-    // Call original end (cast: originalEnd's overloads don't cover this generic re-call shape)
-    (originalEnd as (...args: unknown[]) => Response).call(this, chunk, encoding, cb);
-  };
-  
+  });
+
+  res.on('close', releaseConnection);
+
   next();
 };
 
@@ -155,10 +153,10 @@ export const httpMetricsMiddleware = (req: Request, res: Response, next: NextFun
  * Get current metrics for health endpoints
  */
 export const getMetricsData = (): MetricsData & { averageResponseTime: number } => {
-  const averageResponseTime = metricsData.totalRequests > 0 
-    ? metricsData.totalResponseTime / metricsData.totalRequests 
+  const averageResponseTime = metricsData.totalRequests > 0
+    ? metricsData.totalResponseTime / metricsData.totalRequests
     : 0;
-    
+
   return {
     ...metricsData,
     averageResponseTime,
@@ -177,18 +175,39 @@ export const resetMetrics = (): void => {
 };
 
 /**
+ * Guards the /metrics and /api/metrics scrape endpoints with a shared secret,
+ * since they're queried by infra tooling (not a logged-in user) and would
+ * otherwise be public and unauthenticated, exposing process memory/uptime
+ * and per-route request counts to anyone.
+ */
+export const metricsAuthMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  const expectedToken = process.env.METRICS_TOKEN || 'dev-metrics-token';
+
+  if (req.headers['x-metrics-token'] !== expectedToken) {
+    res.status(401).json({
+      errors: {
+        authorization: ['missing or invalid metrics token'],
+      },
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
  * Metrics health check endpoint handler
  */
 export const metricsHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const data = getMetricsData();
-    
+
     // Convert Map to object for JSON serialization
     const endpointCounts: Record<string, number> = {};
     data.endpointCounts.forEach((count, endpoint) => {
       endpointCounts[endpoint] = count;
     });
-    
+
     const healthMetrics = {
       timestamp: new Date().toISOString(),
       service: 'conduit-api',
@@ -204,16 +223,16 @@ export const metricsHandler = async (req: Request, res: Response): Promise<void>
       },
       status: 'healthy',
     };
-    
+
     res.json(healthMetrics);
-    
+
     logger.info('[METRICS] Health metrics served');
   } catch (error) {
     res.status(500).json({
       error: 'Failed to retrieve metrics',
       timestamp: new Date().toISOString(),
     });
-    
+
     logger.error({ error }, '[METRICS] Failed to serve metrics');
   }
 };
@@ -226,7 +245,7 @@ export const prometheusMetricsHandler = async (req: Request, res: Response): Pro
     // This would contain Prometheus format metrics
     // For now, serve OpenTelemetry equivalent
     const data = getMetricsData();
-    
+
     const prometheusFormat = [
       '# HELP http_requests_total Total number of HTTP requests',
       '# TYPE http_requests_total counter',
@@ -245,10 +264,10 @@ export const prometheusMetricsHandler = async (req: Request, res: Response): Pro
       `http_request_duration_seconds_sum ${data.totalResponseTime}`,
       `http_request_duration_seconds_count ${data.totalRequests}`,
     ].join('\n');
-    
+
     res.set('Content-Type', 'text/plain; version=0.0.4');
     res.send(prometheusFormat);
-    
+
     logger.info('[METRICS] Prometheus metrics served');
   } catch (error) {
     res.status(500).send('# Error generating metrics\n');

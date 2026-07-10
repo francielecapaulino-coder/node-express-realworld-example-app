@@ -56,6 +56,7 @@ jest.mock('../../telemetry', () => ({
 // Mock rate limiting
 jest.mock('../../app/middleware/rate-limit.middleware', () => ({
   loginRateLimit: (req: any, res: any, next: any) => next(),
+  registrationRateLimit: (req: any, res: any, next: any) => next(),
 }));
 
 const app = express();

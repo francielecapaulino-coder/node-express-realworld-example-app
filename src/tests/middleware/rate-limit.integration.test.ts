@@ -95,3 +95,43 @@ describe('Rate limiting on POST /api/users/login', () => {
     expect(registerResponse.status).not.toBe(429);
   });
 });
+
+describe('Rate limiting on POST /api/users', () => {
+  const buildApp = () => {
+    const app = express();
+    app.use(bodyParser.json());
+    app.use('/api', authController);
+    app.use(notFoundHandler);
+    app.use(globalErrorHandler);
+    return app;
+  };
+
+  // Registration and login use two independent express-rate-limit instances
+  // (registrationRateLimit/loginRateLimit), so their request counts don't
+  // share a bucket even though both key off the same IP. This file's login
+  // describe block above already exhausts loginRateLimit's budget for
+  // 127.0.0.1 (the middleware is a module-level singleton, reused by every
+  // app instance built via buildApp() within this file) — sending well past
+  // registrationRateLimit's own limit here proves it blocks independently,
+  // regardless of how many prior tests in this file already touched login.
+  test('blocks registration attempts once its own limit is exceeded, independently of the login limiter', async () => {
+    const app = buildApp();
+
+    let last;
+    for (let i = 0; i < 12; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      last = await request(app)
+        .post('/api/users')
+        .send({ user: { email: `user${i}@example.com`, username: `user${i}`, password: 'password123' } });
+    }
+
+    expect(last!.status).toBe(429);
+    expect(last!.body).toEqual({
+      errors: {
+        'rate-limit': [
+          'Too many registration attempts from this IP, please try again after 15 minutes',
+        ],
+      },
+    });
+  });
+});

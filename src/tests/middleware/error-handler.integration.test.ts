@@ -5,6 +5,8 @@ jest.mock('../../logger', () => ({
 }));
 
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
+import { UnauthorizedError } from 'express-jwt';
 import { asyncHandler, globalErrorHandler, notFoundHandler } from '../../app/middleware/error-handler.middleware';
 import HttpException from '../../app/models/http-exception.model';
 import logger from '../../logger';
@@ -62,7 +64,7 @@ describe('Error Handler Integration Tests', () => {
   });
 
   describe('Global Error Handler', () => {
-test('should handle HttpException properly', () => {
+    test('should handle HttpException properly', () => {
       // Given
       const errorMessage = JSON.stringify({
         errors: {
@@ -79,15 +81,14 @@ test('should handle HttpException properly', () => {
         nextFunction
       );
 
-// Then
+      // Then
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith(errorMessage);
     });
 
     test('should handle JWT authentication errors', () => {
       // Given
-      const jwtError = new Error('UnauthorizedError');
-      jwtError.name = 'UnauthorizedError';
+      const jwtError = new UnauthorizedError('credentials_required', { message: 'No authorization token was found' });
 
       // When
       globalErrorHandler(
@@ -107,8 +108,10 @@ test('should handle HttpException properly', () => {
     });
 
     test('should handle Prisma known-request errors with 400 status', () => {
-      const prismaError = new Error('Unique constraint failed');
-      prismaError.name = 'PrismaClientKnownRequestError';
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
 
       globalErrorHandler(prismaError, mockRequest as Request, mockResponse as Response, nextFunction);
 
@@ -119,37 +122,13 @@ test('should handle HttpException properly', () => {
     });
 
     test('should handle Prisma initialization errors with 503 status', () => {
-      const prismaError = new Error('Cannot reach database server');
-      prismaError.name = 'PrismaClientInitializationError';
+      const prismaError = new Prisma.PrismaClientInitializationError('Cannot reach database server', '5.0.0');
 
       globalErrorHandler(prismaError, mockRequest as Request, mockResponse as Response, nextFunction);
 
       expect(mockResponse.status).toHaveBeenCalledWith(503);
       expect(mockResponse.json).toHaveBeenCalledWith({
         errors: { database: ['service unavailable'] },
-      });
-    });
-
-    test('should handle validation errors with 422 status and include the message', () => {
-      const validationError = new Error('username is required');
-      validationError.name = 'ValidationError';
-
-      globalErrorHandler(validationError, mockRequest as Request, mockResponse as Response, nextFunction);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(422);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        errors: { validation: ['username is required'] },
-      });
-    });
-
-    test('should handle rate-limit errors with 429 status and include the message', () => {
-      const rateLimitError = new Error('Too many requests from this IP');
-
-      globalErrorHandler(rateLimitError, mockRequest as Request, mockResponse as Response, nextFunction);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(429);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        errors: { 'rate-limit': ['Too many requests from this IP'] },
       });
     });
 
@@ -194,18 +173,14 @@ test('should handle HttpException properly', () => {
 
     test('should always return errors in RealWorld format', () => {
       // Test different error types to ensure consistent format
-      const errorCases = [
-{ error: new HttpException(400, JSON.stringify({ errors: { field: ['error'] } })), expectedCode: 400 },
-        { error: new Error('UnauthorizedError'), expectedCode: 401 },
+      const errorCases: Array<{ error: Error; expectedCode: number }> = [
+        { error: new HttpException(400, JSON.stringify({ errors: { field: ['error'] } })), expectedCode: 400 },
+        { error: new UnauthorizedError('credentials_required', { message: 'no token' }), expectedCode: 401 },
         { error: new Error('Generic error'), expectedCode: 500 },
       ];
 
-errorCases.forEach(({ error, expectedCode }) => {
-        Object.defineProperty(error, 'name', {
-          value: error.message.includes('Error') ? error.message : error.constructor.name
-        });
-
-// Reset mock
+      errorCases.forEach(({ error, expectedCode }) => {
+        // Reset mock
         (mockResponse.status as jest.Mock).mockClear().mockReturnThis();
         (mockResponse.json as jest.Mock).mockClear().mockReturnThis();
 
@@ -217,7 +192,7 @@ errorCases.forEach(({ error, expectedCode }) => {
         );
 
         expect(mockResponse.status).toHaveBeenCalledWith(expectedCode);
-// For HttpException, expect the string message directly
+        // For HttpException, expect the string message directly
         if (error instanceof HttpException) {
           expect(mockResponse.json).toHaveBeenCalledWith(error.message);
         } else {
@@ -267,7 +242,7 @@ errorCases.forEach(({ error, expectedCode }) => {
         },
       });
 
-// Sensitive details should not be in the response
+      // Sensitive details should not be in the response
       expect(mockResponse.json).toHaveBeenCalled();
       const responseData = (mockResponse.json as jest.Mock).mock.calls?.[0]?.[0] || {};
       expect(JSON.stringify(responseData)).not.toContain('secret123');

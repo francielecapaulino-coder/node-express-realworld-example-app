@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
+import { UnauthorizedError } from 'express-jwt';
 import HttpException from '../models/http-exception.model';
 import logger from '../../logger';
 
@@ -39,7 +41,7 @@ export const globalErrorHandler = (
   }
 
   // Handle JWT authentication errors
-  if (error.name === 'UnauthorizedError') {
+  if (error instanceof UnauthorizedError) {
     res.status(401).json({
       errors: {
         authorization: ['missing or invalid authorization credentials']
@@ -49,7 +51,7 @@ export const globalErrorHandler = (
   }
 
   // Handle Prisma validation errors
-  if (error.name === 'PrismaClientKnownRequestError') {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
     res.status(400).json({
       errors: {
         database: ['invalid data provided']
@@ -59,30 +61,10 @@ export const globalErrorHandler = (
   }
 
   // Handle Prisma connection errors
-  if (error.name === 'PrismaClientInitializationError') {
+  if (error instanceof Prisma.PrismaClientInitializationError) {
     res.status(503).json({
       errors: {
         database: ['service unavailable']
-      }
-    });
-    return;
-  }
-
-  // Handle validation errors
-  if (error.name === 'ValidationError') {
-    res.status(422).json({
-      errors: {
-        validation: [error.message]
-      }
-    });
-    return;
-  }
-
-  // Handle rate limit errors
-  if (error.message && error.message.includes('Too many requests')) {
-    res.status(429).json({
-      errors: {
-        'rate-limit': [error.message]
       }
     });
     return;
