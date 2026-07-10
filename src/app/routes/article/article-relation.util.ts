@@ -1,6 +1,5 @@
-import profileMapper from '../profile/profile.utils';
+import authorMapper, { AuthorWithFollowers } from './author.mapper';
 import { Tag } from '../tag/tag.model';
-import { AuthorWithFollowers } from './author.mapper';
 
 // Shared by every query (article/comment/favorite/bookmark) that includes the
 // article's author, so the projection can't drift between endpoints. followedBy
@@ -46,5 +45,5 @@ export const mapRelationArticle = <T extends RelationArticleBase>(article: T, id
   createdAt: article.createdAt,
   updatedAt: article.updatedAt,
   tagList: article.tagList.map((tag) => tag.name),
-  author: profileMapper(article.author, id),
+  author: authorMapper(article.author, id),
 });

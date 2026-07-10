@@ -1,11 +1,6 @@
-import { AuthorWithFollowers } from '../article/author.mapper';
+import authorMapper, { AuthorWithFollowers } from '../article/author.mapper';
 import { Profile } from './profile.model';
 
-const profileMapper = (user: AuthorWithFollowers, id: number | undefined): Profile => ({
-  username: user.username,
-  bio: user.bio,
-  image: user.image,
-  following: id ? user.followedBy.some((followingUser) => followingUser.id === id) : false,
-});
+const profileMapper = (user: AuthorWithFollowers, id: number | undefined): Profile => authorMapper(user, id);
 
 export default profileMapper;
