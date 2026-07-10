@@ -42,12 +42,14 @@ export const getCommentsByArticle = async (slug: string, id?: number) => {
     },
   });
 
-  const result = comments?.comments.map((comment) => ({
+  if (!comments) {
+    throw new HttpException(404, { errors: { article: ['not found'] } });
+  }
+
+  return comments.comments.map((comment) => ({
     ...comment,
     author: authorMapper(comment.author, id),
   }));
-
-  return result;
 };
 
 export const addComment = async (body: string, slug: string, id: number) => {

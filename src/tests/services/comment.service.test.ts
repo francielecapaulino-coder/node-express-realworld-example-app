@@ -63,12 +63,13 @@ describe('CommentService', () => {
       );
     });
 
-    test('returns undefined without throwing when the article does not exist', async () => {
+    test('throws a 404 when the article does not exist', async () => {
       prismaMock.article.findUnique.mockResolvedValue(null);
 
-      const result = await getCommentsByArticle('missing-slug');
-
-      expect(result).toBeUndefined();
+      await expect(getCommentsByArticle('missing-slug')).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
     });
 
     test('following is false when the current user is not in the comment author followedBy list', async () => {

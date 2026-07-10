@@ -19,17 +19,32 @@ export const AUTHOR_SELECT = {
 } as const;
 
 interface RelationArticleBase {
+  slug: string;
+  title: string;
+  description: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
   tagList: Tag[];
   author: AuthorWithFollowers;
 }
 
 // Shared by favoriteArticle/unfavoriteArticle and bookmarkArticle/unbookmarkArticle:
 // both connect/disconnect a personal M:N relation on an article and then map the
-// author + tagList the same way, differing only in which relation/count field
-// they read (favoritedBy/favoritesCount vs bookmarkedBy/bookmarksCount), which
-// Prisma's generated types require to stay literal at each call site.
+// article the same way articleMapper does for the plain CRUD endpoints, differing
+// only in which relation/count field they read (favoritedBy/favoritesCount vs
+// bookmarkedBy/bookmarksCount), which Prisma's generated types require to stay
+// literal at each call site. Whitelists fields explicitly (mirroring
+// article.mapper.ts) instead of spreading the raw Prisma result, which would leak
+// internal fields (id, authorId) and the raw favoritedBy/bookmarkedBy id array of
+// every other user who's toggled the relation.
 export const mapRelationArticle = <T extends RelationArticleBase>(article: T, id: number) => ({
-  ...article,
-  author: profileMapper(article.author, id),
+  slug: article.slug,
+  title: article.title,
+  description: article.description,
+  body: article.body,
+  createdAt: article.createdAt,
+  updatedAt: article.updatedAt,
   tagList: article.tagList.map((tag) => tag.name),
+  author: profileMapper(article.author, id),
 });

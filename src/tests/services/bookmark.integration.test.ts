@@ -42,20 +42,26 @@ describe('Bookmark Integration Tests', () => {
   describe('Bookmark Article Feature', () => {
     test('should handle bookmarking non-existent article', async () => {
       // Given
-      (prisma as any).article.update.mockRejectedValue(new Error('Article not found'));
+      (prisma as any).article.findUnique.mockResolvedValue(null);
 
       // When & Then
-      await expect(bookmarkArticle('non-existent-slug', 1))
-        .rejects.toThrow('Article not found');
+      await expect(bookmarkArticle('non-existent-slug', 1)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
+      expect((prisma as any).article.update).not.toHaveBeenCalled();
     });
 
-    test('should handle unbookmarking non-bookmarked article', async () => {
+    test('should handle unbookmarking non-existent article', async () => {
       // Given
-      (prisma as any).article.update.mockRejectedValue(new Error('Article not bookmarked'));
+      (prisma as any).article.findUnique.mockResolvedValue(null);
 
       // When & Then
-      await expect(unbookmarkArticle('test-article-slug', 1))
-        .rejects.toThrow('Article not bookmarked');
+      await expect(unbookmarkArticle('test-article-slug', 1)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
+      expect((prisma as any).article.update).not.toHaveBeenCalled();
     });
   });
 
@@ -152,6 +158,7 @@ test('should correctly identify not bookmarked status when user has not bookmark
         _count: { bookmarkedBy: 2 },
       };
 
+      (prisma as any).article.findUnique.mockResolvedValue({ id: mockSharedArticle.id });
       (prisma as any).article.update.mockResolvedValue(expectedResponse);
 
       // When
