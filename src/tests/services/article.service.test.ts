@@ -347,7 +347,10 @@ describe('ArticleService', () => {
     test('throws a 404 when the article does not exist', async () => {
       prismaMock.article.findFirst.mockResolvedValue(null);
 
-      await expect(updateArticle({}, 'missing-slug', 456)).rejects.toMatchObject({ errorCode: 404 });
+      await expect(updateArticle({}, 'missing-slug', 456)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
       expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
 
@@ -356,7 +359,7 @@ describe('ArticleService', () => {
 
       await expect(updateArticle({}, mockedArticle.slug, 456)).rejects.toMatchObject({
         errorCode: 403,
-        message: { message: 'You are not authorized to update this article' },
+        message: { errors: { authorization: ['You are not authorized to update this article'] } },
       });
       expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
@@ -415,7 +418,10 @@ describe('ArticleService', () => {
     test('throws a 404 when the article does not exist', async () => {
       prismaMock.article.findFirst.mockResolvedValue(null);
 
-      await expect(deleteArticle('missing-slug', 456)).rejects.toMatchObject({ errorCode: 404 });
+      await expect(deleteArticle('missing-slug', 456)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { article: ['not found'] } },
+      });
       expect(prismaMock.article.delete).not.toHaveBeenCalled();
     });
 
@@ -424,7 +430,7 @@ describe('ArticleService', () => {
 
       await expect(deleteArticle(mockedArticle.slug, 456)).rejects.toMatchObject({
         errorCode: 403,
-        message: { message: 'You are not authorized to delete this article' },
+        message: { errors: { authorization: ['You are not authorized to delete this article'] } },
       });
       expect(prismaMock.article.delete).not.toHaveBeenCalled();
     });

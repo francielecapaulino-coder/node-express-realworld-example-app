@@ -31,6 +31,7 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { Resource } from '@opentelemetry/resources';
 import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import logger from './logger';
 
 const resource = Resource.default().merge(
   new Resource({
@@ -71,7 +72,7 @@ export function startTelemetry(): void {
     sdk.start();
   } catch (error) {
     // Do not crash on telemetry misconfiguration — degrade gracefully
-    console.warn('[telemetry] SDK failed to start:', error);
+    logger.warn({ error }, '[telemetry] SDK failed to start');
   }
 }
 
@@ -83,6 +84,6 @@ export async function stopTelemetry(): Promise<void> {
   try {
     await sdk.shutdown();
   } catch (error) {
-    console.warn('[telemetry] SDK failed to shut down cleanly:', error);
+    logger.warn({ error }, '[telemetry] SDK failed to shut down cleanly');
   }
 }

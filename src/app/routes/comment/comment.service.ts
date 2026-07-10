@@ -119,12 +119,12 @@ export const deleteComment = async (id: number, userId: number) => {
   });
 
   if (!comment) {
-    throw new HttpException(404, {});
+    throw new HttpException(404, { errors: { comment: ['not found'] } });
   }
 
   if (comment.author.id !== userId) {
     throw new HttpException(403, {
-      message: 'You are not authorized to delete this comment',
+      errors: { authorization: ['You are not authorized to delete this comment'] },
     });
   }
 

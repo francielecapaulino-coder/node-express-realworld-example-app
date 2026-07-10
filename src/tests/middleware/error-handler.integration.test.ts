@@ -66,12 +66,12 @@ describe('Error Handler Integration Tests', () => {
   describe('Global Error Handler', () => {
     test('should handle HttpException properly', () => {
       // Given
-      const errorMessage = JSON.stringify({
+      const errorPayload = {
         errors: {
           email: ['is invalid'],
         },
-      });
-      const httpError = new HttpException(400, errorMessage);
+      };
+      const httpError = new HttpException(400, errorPayload);
 
       // When
       globalErrorHandler(
@@ -83,7 +83,7 @@ describe('Error Handler Integration Tests', () => {
 
       // Then
       expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith(errorMessage);
+      expect(mockResponse.json).toHaveBeenCalledWith(errorPayload);
     });
 
     test('should handle JWT authentication errors', () => {
@@ -174,7 +174,7 @@ describe('Error Handler Integration Tests', () => {
     test('should always return errors in RealWorld format', () => {
       // Test different error types to ensure consistent format
       const errorCases: Array<{ error: Error; expectedCode: number }> = [
-        { error: new HttpException(400, JSON.stringify({ errors: { field: ['error'] } })), expectedCode: 400 },
+        { error: new HttpException(400, { errors: { field: ['error'] } }), expectedCode: 400 },
         { error: new UnauthorizedError('credentials_required', { message: 'no token' }), expectedCode: 401 },
         { error: new Error('Generic error'), expectedCode: 500 },
       ];

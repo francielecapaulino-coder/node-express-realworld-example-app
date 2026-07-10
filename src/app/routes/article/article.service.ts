@@ -310,12 +310,12 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
   });
 
   if (!existingArticle) {
-    throw new HttpException(404, {});
+    throw new HttpException(404, { errors: { article: ['not found'] } });
   }
 
   if (existingArticle.author.id !== id) {
     throw new HttpException(403, {
-      message: 'You are not authorized to update this article',
+      errors: { authorization: ['You are not authorized to update this article'] },
     });
   }
 
@@ -406,12 +406,12 @@ export const deleteArticle = async (slug: string, id: number) => {
   });
 
   if (!existingArticle) {
-    throw new HttpException(404, {});
+    throw new HttpException(404, { errors: { article: ['not found'] } });
   }
 
   if (existingArticle.author.id !== id) {
     throw new HttpException(403, {
-      message: 'You are not authorized to delete this article',
+      errors: { authorization: ['You are not authorized to delete this article'] },
     });
   }
   await prisma.article.delete({

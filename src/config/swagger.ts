@@ -327,7 +327,15 @@ const options = {
 
 const specs = swaggerJsdoc(options);
 
+// Interactive docs are useful in dev/staging but reveal the full internal
+// route/schema map to anyone with no auth of their own — disabled in
+// production to reduce recon surface, while staying available everywhere
+// else for local development.
 export const setupSwagger = (app: Express): void => {
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+
   // Swagger UI route
   app.use('/api-docs', swaggerUi.serve);
   app.get('/api-docs', swaggerUi.setup(specs, {

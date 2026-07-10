@@ -389,7 +389,23 @@ describe('metricsAuthMiddleware', () => {
   const originalToken = process.env.METRICS_TOKEN;
 
   afterEach(() => {
-    process.env.METRICS_TOKEN = originalToken;
+    if (originalToken === undefined) {
+      delete process.env.METRICS_TOKEN;
+    } else {
+      process.env.METRICS_TOKEN = originalToken;
+    }
+  });
+
+  test('fails closed with a 401 when METRICS_TOKEN is not configured, even with a header set', () => {
+    delete process.env.METRICS_TOKEN;
+    const req = { headers: { 'x-metrics-token': 'anything' } } as unknown as Request;
+    const res = buildRes();
+    const next = jest.fn();
+
+    metricsAuthMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
   test('rejects requests with a 401 when the x-metrics-token header is missing', () => {

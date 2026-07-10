@@ -178,7 +178,10 @@ describe('CommentService', () => {
     test('throws a 404 when the comment does not exist', async () => {
       prismaMock.comment.findFirst.mockResolvedValue(null);
 
-      await expect(deleteComment(123, 456)).rejects.toMatchObject({ errorCode: 404 });
+      await expect(deleteComment(123, 456)).rejects.toMatchObject({
+        errorCode: 404,
+        message: { errors: { comment: ['not found'] } },
+      });
       expect(prismaMock.comment.delete).not.toHaveBeenCalled();
     });
 
@@ -187,7 +190,7 @@ describe('CommentService', () => {
 
       await expect(deleteComment(1, 456)).rejects.toMatchObject({
         errorCode: 403,
-        message: { message: 'You are not authorized to delete this comment' },
+        message: { errors: { authorization: ['You are not authorized to delete this comment'] } },
       });
       expect(prismaMock.comment.delete).not.toHaveBeenCalled();
     });

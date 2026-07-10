@@ -69,7 +69,19 @@ app.use(globalErrorHandler);
  * Server activation
  */
 
-const PORT = Number(process.env.PORT ?? 3000);
+const parsePort = (raw: string | undefined): number => {
+  if (!raw) {
+    return 3000;
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+    logger.warn({ raw }, 'Invalid PORT env var, falling back to 3000');
+    return 3000;
+  }
+  return parsed;
+};
+
+const PORT = parsePort(process.env.PORT);
 
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT, env: process.env.NODE_ENV ?? 'development' }, 'server started');

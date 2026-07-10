@@ -178,12 +178,15 @@ export const resetMetrics = (): void => {
  * Guards the /metrics and /api/metrics scrape endpoints with a shared secret,
  * since they're queried by infra tooling (not a logged-in user) and would
  * otherwise be public and unauthenticated, exposing process memory/uptime
- * and per-route request counts to anyone.
+ * and per-route request counts to anyone. Fails closed when METRICS_TOKEN
+ * isn't configured — no hardcoded fallback token, since that would just be
+ * a second guessable well-known default (the same class of risk this guard
+ * exists to avoid).
  */
 export const metricsAuthMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  const expectedToken = process.env.METRICS_TOKEN || 'dev-metrics-token';
+  const expectedToken = process.env.METRICS_TOKEN;
 
-  if (req.headers['x-metrics-token'] !== expectedToken) {
+  if (!expectedToken || req.headers['x-metrics-token'] !== expectedToken) {
     res.status(401).json({
       errors: {
         authorization: ['missing or invalid metrics token'],
