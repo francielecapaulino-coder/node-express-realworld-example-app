@@ -1,73 +1,34 @@
+jest.mock('../../prisma/prisma-client');
+
+import prismaMock from '../prisma-mock';
 import { getArticle } from '../../app/routes/article/article.service';
 import { bookmarkArticle, unbookmarkArticle } from '../../app/routes/bookmark/bookmark.service';
 
-// Mock the entire module for this test
-jest.mock('../../prisma/prisma-client', () => {
-  const mockPrisma = {
-    article: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-    user: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    comment: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      delete: jest.fn(),
-    },
-    tag: {
-      findMany: jest.fn(),
-    },
-  };
-  return {
-    __esModule: true,
-    default: mockPrisma,
-  };
-});
-
-import prisma from '../../prisma/prisma-client';
-
 describe('Bookmark Integration Tests', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('Bookmark Article Feature', () => {
     test('should handle bookmarking non-existent article', async () => {
-      // Given
-      (prisma as any).article.findUnique.mockResolvedValue(null);
+      prismaMock.article.findUnique.mockResolvedValue(null);
 
-      // When & Then
       await expect(bookmarkArticle('non-existent-slug', 1)).rejects.toMatchObject({
         errorCode: 404,
         message: { errors: { article: ['not found'] } },
       });
-      expect((prisma as any).article.update).not.toHaveBeenCalled();
+      expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
 
     test('should handle unbookmarking non-existent article', async () => {
-      // Given
-      (prisma as any).article.findUnique.mockResolvedValue(null);
+      prismaMock.article.findUnique.mockResolvedValue(null);
 
-      // When & Then
       await expect(unbookmarkArticle('test-article-slug', 1)).rejects.toMatchObject({
         errorCode: 404,
         message: { errors: { article: ['not found'] } },
       });
-      expect((prisma as any).article.update).not.toHaveBeenCalled();
+      expect(prismaMock.article.update).not.toHaveBeenCalled();
     });
   });
 
   describe('Bookmark State Validation', () => {
-test('should correctly identify bookmarked status when user has bookmarked', async () => {
-      // Given - simplified test focusing on core functionality
+    test('should correctly identify bookmarked status when user has bookmarked', async () => {
       const mockBookmarkedArticle = {
         id: 42,
         slug: 'bookmarked-article',
@@ -82,13 +43,11 @@ test('should correctly identify bookmarked status when user has bookmarked', asy
         author: { id: 2, username: 'author', bio: null, image: null, followedBy: [] },
       };
 
-      (prisma as any).article.findUnique.mockResolvedValue(mockBookmarkedArticle);
+      prismaMock.article.findUnique.mockResolvedValue(mockBookmarkedArticle as any);
 
-      // When
-      const result = await getArticle('bookmarked-article', 1) as any;
+      const result = (await getArticle('bookmarked-article', 1)) as any;
 
-      // Then - Check if method was called and structure returned
-      expect((prisma as any).article.findUnique).toHaveBeenCalledWith({
+      expect(prismaMock.article.findUnique).toHaveBeenCalledWith({
         where: { slug: 'bookmarked-article' },
         include: expect.any(Object),
       });
@@ -96,8 +55,7 @@ test('should correctly identify bookmarked status when user has bookmarked', asy
       expect(result.slug).toBe('bookmarked-article');
     });
 
-test('should correctly identify not bookmarked status when user has not bookmarked', async () => {
-      // Given - simplified test
+    test('should correctly identify not bookmarked status when user has not bookmarked', async () => {
       const mockNotBookmarkedArticle = {
         id: 42,
         slug: 'not-bookmarked-article',
@@ -112,13 +70,11 @@ test('should correctly identify not bookmarked status when user has not bookmark
         author: { id: 2, username: 'author', bio: null, image: null, followedBy: [] },
       };
 
-      (prisma as any).article.findUnique.mockResolvedValue(mockNotBookmarkedArticle);
+      prismaMock.article.findUnique.mockResolvedValue(mockNotBookmarkedArticle as any);
 
-      // When
-      const result = await getArticle('not-bookmarked-article', 1) as any;
+      const result = (await getArticle('not-bookmarked-article', 1)) as any;
 
-      // Then - Check core functionality
-      expect((prisma as any).article.findUnique).toHaveBeenCalled();
+      expect(prismaMock.article.findUnique).toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(result.slug).toBe('not-bookmarked-article');
     });
@@ -126,7 +82,6 @@ test('should correctly identify not bookmarked status when user has not bookmark
 
   describe('Bookmark Concurrent Operations', () => {
     test('should handle multiple users bookmarking same article', async () => {
-      // Given
       const mockSharedArticle = {
         id: 42,
         slug: 'shared-article',
@@ -158,13 +113,11 @@ test('should correctly identify not bookmarked status when user has not bookmark
         _count: { bookmarkedBy: 2 },
       };
 
-      (prisma as any).article.findUnique.mockResolvedValue({ id: mockSharedArticle.id });
-      (prisma as any).article.update.mockResolvedValue(expectedResponse);
+      prismaMock.article.findUnique.mockResolvedValue({ id: mockSharedArticle.id } as any);
+      prismaMock.article.update.mockResolvedValue(expectedResponse as any);
 
-      // When
       const result = await bookmarkArticle('shared-article', 1);
 
-      // Then
       expect(result.bookmarked).toBe(true);
       expect(result.bookmarksCount).toBe(2);
     });

@@ -288,7 +288,6 @@ describe('ArticleService', () => {
           body: 'new body',
           description: 'new desc',
           slug: 'A-different-title-456',
-          updatedAt: expect.any(Date),
           tagList: {
             connectOrCreate: [
               { create: { name: 'dragons' }, where: { name: 'dragons' } },
@@ -320,7 +319,6 @@ describe('ArticleService', () => {
         data: {
           title: 'New title',
           slug: 'New-title-456',
-          updatedAt: expect.any(Date),
           tagList: { connectOrCreate: [{ create: { name: 'newtag' }, where: { name: 'newtag' } }] },
         },
         include: ARTICLE_INCLUDE,
@@ -338,7 +336,6 @@ describe('ArticleService', () => {
         where: { slug: mockedArticle.slug },
         data: {
           body: 'only the body changes',
-          updatedAt: expect.any(Date),
         },
         include: ARTICLE_INCLUDE,
       });

@@ -362,7 +362,6 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
       ...(article.body ? { body: article.body } : {}),
       ...(article.description ? { description: article.description } : {}),
       ...(newSlug ? { slug: newSlug } : {}),
-      updatedAt: new Date(),
       ...(tagListProvided ? { tagList: { connectOrCreate: tagList } } : {}),
     },
     include: {
