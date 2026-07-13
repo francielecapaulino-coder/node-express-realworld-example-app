@@ -47,8 +47,13 @@ RUN apk add --no-cache openssl && \
 COPY --from=builder /build/dist/api ./api
 COPY --from=builder /build/package*.json ./
 COPY --from=builder /build/src/prisma/schema.prisma ./api/prisma/schema.prisma
+COPY --from=builder /build/src/prisma/migrations ./api/prisma/migrations
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-# Install production dependencies only
+# Install production dependencies only. The `prisma` CLI (not just
+# @prisma/client) is a production dependency specifically so
+# docker-entrypoint.sh can run `prisma migrate deploy` at container start
+# without reaching out to the network for it.
 RUN npm ci --omit=dev --ignore-scripts
 
 # Reuse the already-generated Prisma client + query engine from the builder
@@ -57,11 +62,10 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /build/node_modules/@prisma/client ./node_modules/@prisma/client
 
-RUN chown -R api:api .
+RUN chmod +x ./docker-entrypoint.sh && chown -R api:api .
 
 USER api
 
-# Start the server.
-# Run Prisma migrations before the first start with:
-#   docker compose exec api npx prisma migrate deploy
-CMD ["node", "api"]
+# Applies any pending migrations, then starts the server — no manual
+# `docker compose exec api npx prisma migrate deploy` step required.
+ENTRYPOINT ["./docker-entrypoint.sh"]

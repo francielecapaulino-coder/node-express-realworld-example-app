@@ -70,7 +70,12 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-conduit}:${POSTGRES_PASSWORD:-conduit}@postgres:5432/${POSTGRES_DB:-conduit}
-      JWT_SECRET: ${JWT_SECRET:-superSecret}
+      # No default here on purpose: the app itself (token.utils.ts's
+      # getJwtSecret()) refuses to start with NODE_ENV=production and no
+      # JWT_SECRET set, rather than silently signing tokens with a
+      # guessable value. Set JWT_SECRET in your .env (already gitignored)
+      # to run this locally.
+      JWT_SECRET: ${JWT_SECRET}
       # OTel SDK configuration — points to the bundled collector inside lgtm
       OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
       OTEL_SERVICE_NAME: conduit-api
