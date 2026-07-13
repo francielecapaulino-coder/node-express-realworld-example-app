@@ -38,6 +38,7 @@ const setupBasicMocks = () => {
   
   prismaMock.tag = {
     findMany: jest.fn().mockResolvedValue([]),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
   };
 };
 

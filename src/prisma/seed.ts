@@ -27,10 +27,15 @@ export const generateUser = async (): Promise<RegisteredUser> =>
     demo: true,
   });
 
-export const generateArticle = async (id: number) =>
+// index disambiguates the title (and therefore the derived slug,
+// `${slugify(title)}-${id}`) when randPhrase() happens to generate the
+// same phrase twice for the same user — plausible across 12 articles per
+// user given its dictionary size, and would otherwise fail with a
+// "title must be unique" 422.
+export const generateArticle = async (id: number, index: number) =>
   createArticle(
     {
-      title: randPhrase(),
+      title: `${randPhrase()} ${index}`,
       description: randParagraph(),
       body: randLines({ length: 10 }).join(' '),
       tagList: randWord({ length: 4 }),
@@ -42,11 +47,25 @@ export const generateComment = async (id: number, slug: string) =>
   addComment(randParagraph(), slug, id);
 
 const main = async () => {
-  const users = await Promise.all(Array.from({ length: 12 }, () => generateUser()));
+  // Users and articles are each created sequentially: their uniqueness
+  // checks (email/username, article slug) are a separate read then a
+  // write, not one atomic step, so firing them concurrently for values
+  // that can collide (e.g. the same user's articles, whose slugs all
+  // include that user's id) reliably races. Comments have no uniqueness
+  // constraint at all, so those stay parallel across users.
+  const users: RegisteredUser[] = [];
+  // eslint-disable-next-line no-restricted-syntax
+  for (let i = 0; i < 12; i++) {
+    users.push(await generateUser());
+  }
 
   // eslint-disable-next-line no-restricted-syntax
   for (const user of users) {
-    const articles = await Promise.all(Array.from({ length: 12 }, () => generateArticle(user.id)));
+    const articles = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for (let i = 0; i < 12; i++) {
+      articles.push(await generateArticle(user.id, i));
+    }
 
     // eslint-disable-next-line no-restricted-syntax
     for (const article of articles) {

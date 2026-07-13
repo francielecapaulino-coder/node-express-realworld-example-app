@@ -76,6 +76,25 @@ const buildFindAllQuery = (query: ArticleListQuery, id: number | undefined): Pri
   return queries;
 };
 
+// connectOrCreate races under concurrency: two requests creating a brand-new
+// tag at the same time can both see it as missing and both attempt the
+// create branch, and one loses to Tag.name's unique constraint (P2002) —
+// tag.upsert has the exact same race (still a separate read-then-write in
+// this Prisma version, confirmed by reproducing the failure with 12
+// concurrent seed writers). createMany + skipDuplicates compiles to one
+// INSERT ... ON CONFLICT DO NOTHING statement, which Postgres resolves
+// atomically with no read step to race against.
+const ensureTagsExist = async (tags: string[]) => {
+  if (!tags.length) {
+    return;
+  }
+
+  await prisma.tag.createMany({
+    data: tags.map((name) => ({ name })),
+    skipDuplicates: true,
+  });
+};
+
 export const getArticles = async (query: ArticleListQuery, id?: number) => {
   const andQueries = buildFindAllQuery(query, id);
   const articlesCount = await prisma.article.count({
@@ -198,6 +217,8 @@ export const createArticle = async (article: ArticleInput, id: number) => {
     throw new HttpException(422, { errors: { title: ['must be unique'] } });
   }
 
+  await ensureTagsExist(tags);
+
   const {
     authorId,
     id: articleId,
@@ -209,10 +230,7 @@ export const createArticle = async (article: ArticleInput, id: number) => {
       body,
       slug,
       tagList: {
-        connectOrCreate: tags.map((tag: string) => ({
-          create: { name: tag },
-          where: { name: tag },
-        })),
+        connect: tags.map((tag: string) => ({ name: tag })),
       },
       author: {
         connect: {
@@ -341,16 +359,11 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
   // Only touch tags when the request actually included a tagList — otherwise
   // an update that only changes e.g. the title would silently wipe them.
   const tagListProvided = 'tagList' in article;
-  const tagList =
-    Array.isArray(article.tagList) && article.tagList.length
-      ? article.tagList.map((tag: string) => ({
-          create: { name: tag },
-          where: { name: tag },
-        }))
-      : [];
+  const tags = Array.isArray(article.tagList) ? (article.tagList as string[]) : [];
 
   if (tagListProvided) {
     await disconnectArticlesTags(slug);
+    await ensureTagsExist(tags);
   }
 
   const updatedArticle = await prisma.article.update({
@@ -362,7 +375,7 @@ export const updateArticle = async (article: ArticleInput, slug: string, id: num
       ...(article.body ? { body: article.body } : {}),
       ...(article.description ? { description: article.description } : {}),
       ...(newSlug ? { slug: newSlug } : {}),
-      ...(tagListProvided ? { tagList: { connectOrCreate: tagList } } : {}),
+      ...(tagListProvided ? { tagList: { connect: tags.map((tag) => ({ name: tag })) } } : {}),
     },
     include: {
       tagList: {

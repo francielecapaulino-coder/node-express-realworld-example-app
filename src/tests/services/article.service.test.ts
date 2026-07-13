@@ -160,6 +160,10 @@ describe('ArticleService', () => {
         where: { slug: 'How-to-train-your-dragon-456' },
         select: { slug: true },
       });
+      expect(prismaMock.tag.createMany).toHaveBeenCalledWith({
+        data: [{ name: 'dragons' }],
+        skipDuplicates: true,
+      });
       expect(prismaMock.article.create).toHaveBeenCalledWith({
         data: {
           title: 'How to train your dragon',
@@ -167,7 +171,7 @@ describe('ArticleService', () => {
           body: 'body',
           slug: 'How-to-train-your-dragon-456',
           tagList: {
-            connectOrCreate: [{ create: { name: 'dragons' }, where: { name: 'dragons' } }],
+            connect: [{ name: 'dragons' }],
           },
           author: { connect: { id: 456 } },
         },
@@ -193,8 +197,9 @@ describe('ArticleService', () => {
 
       await createArticle({ ...validArticle, tagList: 'not-an-array' }, 456);
 
+      expect(prismaMock.tag.createMany).not.toHaveBeenCalled();
       expect(prismaMock.article.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ tagList: { connectOrCreate: [] } }) }),
+        expect.objectContaining({ data: expect.objectContaining({ tagList: { connect: [] } }) }),
       );
     });
 
@@ -281,6 +286,10 @@ describe('ArticleService', () => {
         where: { slug: mockedArticle.slug },
         select: { author: { select: { id: true, username: true } } },
       });
+      expect(prismaMock.tag.createMany).toHaveBeenCalledWith({
+        data: [{ name: 'dragons' }, { name: 'training' }],
+        skipDuplicates: true,
+      });
       expect(prismaMock.article.update).toHaveBeenCalledWith({
         where: { slug: mockedArticle.slug },
         data: {
@@ -289,10 +298,7 @@ describe('ArticleService', () => {
           description: 'new desc',
           slug: 'A-different-title-456',
           tagList: {
-            connectOrCreate: [
-              { create: { name: 'dragons' }, where: { name: 'dragons' } },
-              { create: { name: 'training' }, where: { name: 'training' } },
-            ],
+            connect: [{ name: 'dragons' }, { name: 'training' }],
           },
         },
         include: ARTICLE_INCLUDE,
@@ -314,12 +320,16 @@ describe('ArticleService', () => {
         where: { slug: mockedArticle.slug },
         data: { tagList: { set: [] } },
       });
+      expect(prismaMock.tag.createMany).toHaveBeenCalledWith({
+        data: [{ name: 'newtag' }],
+        skipDuplicates: true,
+      });
       expect(prismaMock.article.update).toHaveBeenNthCalledWith(2, {
         where: { slug: mockedArticle.slug },
         data: {
           title: 'New title',
           slug: 'New-title-456',
-          tagList: { connectOrCreate: [{ create: { name: 'newtag' }, where: { name: 'newtag' } }] },
+          tagList: { connect: [{ name: 'newtag' }] },
         },
         include: ARTICLE_INCLUDE,
       });
@@ -382,8 +392,9 @@ describe('ArticleService', () => {
 
       await updateArticle({ tagList: 'dragons' }, mockedArticle.slug, 456);
 
+      expect(prismaMock.tag.createMany).not.toHaveBeenCalled();
       expect(prismaMock.article.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ tagList: { connectOrCreate: [] } }) }),
+        expect.objectContaining({ data: expect.objectContaining({ tagList: { connect: [] } }) }),
       );
     });
 
