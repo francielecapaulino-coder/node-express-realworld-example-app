@@ -1,5 +1,6 @@
 import { expressjwt as jwt } from 'express-jwt';
 import * as express from 'express';
+import { getJwtSecret } from './token.utils';
 
 export const getTokenFromHeaders = (req: express.Request): string | undefined => {
   if (
@@ -13,12 +14,12 @@ export const getTokenFromHeaders = (req: express.Request): string | undefined =>
 
 const auth = {
   required: jwt({
-    secret: process.env.JWT_SECRET || 'superSecret',
+    secret: getJwtSecret(),
     getToken: getTokenFromHeaders,
     algorithms: ['HS256'],
   }),
   optional: jwt({
-    secret: process.env.JWT_SECRET || 'superSecret',
+    secret: getJwtSecret(),
     credentialsRequired: false,
     getToken: getTokenFromHeaders,
     algorithms: ['HS256'],

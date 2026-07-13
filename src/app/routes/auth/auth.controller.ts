@@ -1,6 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { asyncHandler } from '../../middleware/error-handler.middleware';
-import auth from './auth';
+import auth, { getTokenFromHeaders } from './auth';
 import { createUser, getCurrentUser, login, updateUser } from './auth.service';
 import { loginRateLimit, registrationRateLimit } from '../../middleware/rate-limit.middleware';
 
@@ -144,7 +144,7 @@ router.post('/users/login', loginRateLimit, asyncHandler(async (req: Request, re
  *         description: Missing or invalid authorization credentials
  */
 router.get('/user', auth.required, asyncHandler(async (req: Request, res: Response) => {
-  const user = await getCurrentUser(req.auth!.user.id);
+  const user = await getCurrentUser(req.auth!.user.id, getTokenFromHeaders(req) as string);
   res.json({ user });
 }));
 

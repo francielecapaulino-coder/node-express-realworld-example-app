@@ -25,6 +25,7 @@ const setupBasicMocks = () => {
   prismaMock.user = {
     create: jest.fn().mockResolvedValue({}),
     findUnique: jest.fn().mockResolvedValue(null),
+    findMany: jest.fn().mockResolvedValue([]),
     update: jest.fn().mockResolvedValue({}),
   };
   

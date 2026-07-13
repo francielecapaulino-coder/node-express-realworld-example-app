@@ -77,7 +77,7 @@ describe('auth.controller', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ user: { username: 'jake' } });
-      expect(authService.getCurrentUser).toHaveBeenCalledWith(456);
+      expect(authService.getCurrentUser).toHaveBeenCalledWith(456, token);
     });
   });
 
