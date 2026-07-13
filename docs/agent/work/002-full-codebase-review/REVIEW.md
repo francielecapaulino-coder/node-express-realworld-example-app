@@ -67,10 +67,9 @@ Rodado após esta revisão para confirmar o score real (meta do escopo: 95%):
 npm run test:mutation:ci
 ```
 
-**Score final: 98.01%** (978 killed, 6 timeout, 17 survived, 3 no coverage, 5 errors
-de 1078 mutantes, em 22min35s) — acima do threshold de quebra (85) e da meta (95).
-
-Arquivos com score abaixo de 100%:
+Primeira rodada: **98.01%** (978 killed, 6 timeout, 17 survived, 3 no coverage, 5
+errors de 1078 mutantes, em 22min35s) — já acima da meta de 95%. Os 17 survivors
+ficavam em 4 arquivos:
 | Arquivo | Score | Survivors |
 |---|---|---|
 | `http-exception.model.ts` | 50.00% | 1 |
@@ -78,10 +77,21 @@ Arquivos com score abaixo de 100%:
 | `auth.service.ts` | 94.62% | 9 |
 | `profile.service.ts` | 92.73% | 4 |
 
+Commit `7aa6ba2` fechou todos os 17: removido código morto em
+`checkUserUniqueness` (o guard interno era inalcançável — os dois call sites já
+garantiam pelo menos um de email/username antes de chamar), e adicionados testes
+para: fronteira de senha de 8 caracteres, uniqueness check com só email (só
+username já era coberto), trimming em `updateUser`, igualdade estrita (não
+`toMatchObject` parcial) no shape de erro de conflito, as 3 branches de
+`getJwtSecret`, e a asserção exata de `findUnique` em `unfollowUser` (que
+`followUser` já tinha).
+
+**Score final confirmado: 100.00%** (992 killed, 6 timeout, 0 survived, 0 no
+coverage, 6 errors de 1078 mutantes, em 23min22s).
+
 Relatório completo: `reports/mutation/mutation.json` (não commitado, gerado localmente).
 
 ## Pendências
 
 - Nenhuma issue aberta no GitHub relacionada a esta revisão (todas as #12–#19
   foram fechadas com referência ao commit que as corrigiu).
-- Fechar os 17 survivors listados acima, se a meta for 100% em vez de 95%.
