@@ -59,7 +59,29 @@ Compare completo: https://github.com/francielecapaulino-coder/node-express-realw
 - `npx prisma db seed` rodado com sucesso até o fim, populando 60 usuários /
   201 artigos / 2016 comentários / 69 tags.
 
+## Mutation testing (Stryker)
+
+Rodado após esta revisão para confirmar o score real (meta do escopo: 95%):
+
+```
+npm run test:mutation:ci
+```
+
+**Score final: 98.01%** (978 killed, 6 timeout, 17 survived, 3 no coverage, 5 errors
+de 1078 mutantes, em 22min35s) — acima do threshold de quebra (85) e da meta (95).
+
+Arquivos com score abaixo de 100%:
+| Arquivo | Score | Survivors |
+|---|---|---|
+| `http-exception.model.ts` | 50.00% | 1 |
+| `token.utils.ts` | 50.00% | 3 |
+| `auth.service.ts` | 94.62% | 9 |
+| `profile.service.ts` | 92.73% | 4 |
+
+Relatório completo: `reports/mutation/mutation.json` (não commitado, gerado localmente).
+
 ## Pendências
 
 - Nenhuma issue aberta no GitHub relacionada a esta revisão (todas as #12–#19
   foram fechadas com referência ao commit que as corrigiu).
+- Fechar os 17 survivors listados acima, se a meta for 100% em vez de 95%.
