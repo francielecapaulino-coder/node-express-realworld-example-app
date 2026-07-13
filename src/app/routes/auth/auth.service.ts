@@ -18,12 +18,9 @@ const validatePasswordLength = (password: string) => {
 // Single query (OR + NOT) instead of two sequential findUnique round-trips.
 // excludeUserId lets updateUser check uniqueness against everyone EXCEPT the
 // user being updated, so re-submitting your own current email/username isn't
-// treated as a conflict.
+// treated as a conflict. Both callers already guarantee at least one of
+// email/username is truthy before calling this.
 const checkUserUniqueness = async (email: string | undefined, username: string | undefined, excludeUserId?: number) => {
-  if (!email && !username) {
-    return;
-  }
-
   const conflicts = await prisma.user.findMany({
     where: {
       OR: [...(email ? [{ email }] : []), ...(username ? [{ username }] : [])],

@@ -119,6 +119,16 @@ describe('AuthService', () => {
       expect(prismaMock.user.create).not.toHaveBeenCalled();
     });
 
+    test('accepts a password exactly at the 8-character minimum', async () => {
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.user.create.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'realworld@me' });
+
+      await expect(
+        createUser({ username: 'RealWorld', email: 'realworld@me', password: '12345678' }),
+      ).resolves.toBeDefined();
+      expect(prismaMock.user.create).toHaveBeenCalled();
+    });
+
     test('throws a 422 with both fields when both email and username already exist', async () => {
       prismaMock.user.findMany.mockResolvedValue([{ email: 'realworld@me', username: 'RealWorld' }] as any);
 
@@ -134,17 +144,26 @@ describe('AuthService', () => {
     test('throws a 422 with only email when just the email already exists', async () => {
       prismaMock.user.findMany.mockResolvedValue([{ email: 'realworld@me', username: 'someone-else' }] as any);
 
-      await expect(
-        createUser({ username: 'RealWorld', email: 'realworld@me', password: 'password123' }),
-      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { email: ['has already been taken'] } } });
+      const error = await createUser({ username: 'RealWorld', email: 'realworld@me', password: 'password123' }).catch(
+        (e) => e,
+      );
+
+      expect(error).toMatchObject({ errorCode: 422 });
+      // Exact equality (not just a partial match) so a false-positive "username
+      // also taken" — the conflict row here doesn't actually match the
+      // username being registered — can't slip through unnoticed.
+      expect(error.message.errors).toEqual({ email: ['has already been taken'] });
     });
 
     test('throws a 422 with only username when just the username already exists', async () => {
       prismaMock.user.findMany.mockResolvedValue([{ email: 'someone-else@me', username: 'RealWorld' }] as any);
 
-      await expect(
-        createUser({ username: 'RealWorld', email: 'realworld@me', password: 'password123' }),
-      ).rejects.toMatchObject({ errorCode: 422, message: { errors: { username: ['has already been taken'] } } });
+      const error = await createUser({ username: 'RealWorld', email: 'realworld@me', password: 'password123' }).catch(
+        (e) => e,
+      );
+
+      expect(error).toMatchObject({ errorCode: 422 });
+      expect(error.message.errors).toEqual({ username: ['has already been taken'] });
     });
   });
 
@@ -310,7 +329,7 @@ describe('AuthService', () => {
       });
     });
 
-    test('checks uniqueness, excluding the current user, when email or username is provided', async () => {
+    test('checks uniqueness, excluding the current user, when only username is provided', async () => {
       prismaMock.user.findMany.mockResolvedValue([]);
       prismaMock.user.update.mockResolvedValue({ id: 123, username: 'newname', email: 'realworld@me' } as any);
 
@@ -320,6 +339,34 @@ describe('AuthService', () => {
         where: { OR: [{ username: 'newname' }], NOT: { id: 123 } },
         select: { email: true, username: true },
       });
+    });
+
+    test('checks uniqueness, excluding the current user, when only email is provided', async () => {
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.user.update.mockResolvedValue({ id: 123, username: 'RealWorld', email: 'new@me' } as any);
+
+      await updateUser({ email: 'new@me' }, 123);
+
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+        where: { OR: [{ email: 'new@me' }], NOT: { id: 123 } },
+        select: { email: true, username: true },
+      });
+    });
+
+    test('trims email/username/password before checking uniqueness and persisting', async () => {
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.user.update.mockResolvedValue({ id: 123, username: 'newname', email: 'new@me' } as any);
+
+      await updateUser({ email: '  new@me  ', username: '  newname  ', password: '  new-password  ' }, 123);
+
+      expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+        where: { OR: [{ email: 'new@me' }, { username: 'newname' }], NOT: { id: 123 } },
+        select: { email: true, username: true },
+      });
+      const updateData = (prismaMock.user.update as jest.Mock).mock.calls[0][0].data;
+      expect(updateData.email).toBe('new@me');
+      expect(updateData.username).toBe('newname');
+      expect(await bcrypt.compare('new-password', updateData.password)).toBe(true);
     });
 
     test('throws a 422 when the new email is already taken by another user', async () => {

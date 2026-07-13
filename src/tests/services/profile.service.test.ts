@@ -122,6 +122,10 @@ describe('ProfileService', () => {
 
       const result = await unfollowUser('AnotherUser', 123);
 
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { username: 'AnotherUser' },
+        select: { id: true },
+      });
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { username: 'AnotherUser' },
         data: { followedBy: { disconnect: { id: 123 } } },
